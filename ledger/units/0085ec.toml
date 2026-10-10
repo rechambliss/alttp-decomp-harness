@@ -1,7 +1,7 @@
 id = "0085ec"
 name = "PrepFrameUploads"
 address = "$00:85EC"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -22,13 +22,79 @@ size_insns = 181
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
+summary = """
+Part 1: packs the per-sprite 2-bit bytes $0A20-$0A9F into the 32-byte OAM high table $0A00-$0A1F: byte n = (s3<<6 | s2<<4 | s1<<2 | s0) & $FF, s_k = $0A20+4n+k, no masking. Written in order n = 28..31, 24..27, ..., 0..3 (Y = $1C down to 0 step 4, four stores per pass).
+Part 2 (D=$0A00, 16-bit A): builds 16-bit pointers in $0AC0-$0AF8 from ROM table lookups (bank DB) indexed by $0100/$0102/$0104 (16-bit), $0107/$0108/$0109/$02C3 (8-bit), plus fixed offsets.
+Two long-addressed countdowns: $7E:C00D (reload 9, or $17 if byte $0A8C is $B5/$BC) steps $7E:C00F by $0400 mod $0C00 and sets $0ADC; $7E:C013 (reload from table $85C2) steps index $7E:C015 by 2 mod $0C and sets $0AE0/$0AE2.
+Finally $0AEC/$0AEE, $0AF0/$0AF2, $0AF6/$0AF8 from $0AE8, $0AEA, $0AF4 (x2 + base). D is saved/restored; exits m8x8 via RTS. No hardware access.
+"""
+inputs = [
+  "M=1, X=1 at entry; P.D (decimal) = 0 (Reset clears it; all ADCs are binary only under this)",
+  "DB (u8): all absolute reads/writes and table reads use it. Expected $00 (Reset never sets DB); dispatched modules are assumed to return with DB=$00. With DB=$00, abs $0100-$0AF4 hit the low-WRAM mirror and $8484-$9842 hit ROM bank 00",
+  "D (u16): only pushed and pulled; value not otherwise used (but PLD sets N/Z from it, see outputs)",
+  "WRAM $7E:0A20-$7E:0A9F OAM_EXT_BITS (128 x u8), all 8 bits used",
+  "WRAM $7E:0100 (u16) index into table $00:9386 and $00:95E4",
+  "WRAM $7E:0102 (u16) index into table $00:9842",
+  "WRAM $7E:0104 (u16) index into table $00:9842",
+  "WRAM $7E:0107 (u8) index into table $00:848C",
+  "WRAM $7E:0108 (u8) index into table $00:849C",
+  "WRAM $7E:0109 (u8; read as u16 twice but $010A has no effect on any result)",
+  "WRAM $7E:02C3 (u8; read as u16, only bits 1-0 used)",
+  "WRAM $7E:C00D ANIM_TILE_TIMER_A countdown (u16)",
+  "WRAM $7E:C00F anim offset A (u16), read only when the $C00D countdown hits 0",
+  "WRAM $7E:0A8C (u8), read only when $C00D hits 0 (dp $8C with D=$0A00)",
+  "WRAM $7E:C013 ANIM_TILE_TIMER_B countdown (u16)",
+  "WRAM $7E:C015 anim index B (u16; only low byte used), read only when $C013 hits 0",
+  "WRAM $7E:0AE8, $7E:0AEA, $7E:0AF4 (u16 each)",
+  "ROM tables (word reads, bank DB): $9386+X0, $95E4+X0 (X0=$0100), $9842+$0102, $9842+$0104, $848C+$0107, $849C+$0108, $84A2+((($0109<<1))&$FF), $85A2+(($0109&$F8)>>2), $8484+(($02C3&3)*2), $85C2+idx, $85CE+idx (idx=new $C015)",
+]
+outputs = [
+  "WRAM $7E:0A00-$7E:0A1F OAM_BUFFER_HIGH (32 x u8), always all written",
+  "WRAM $7E:0AC0 = T848C[$0107]; $0AC2 = $0AC0 + $0180",
+  "WRAM $7E:0AC4 = T849C[$0108]; $0AC6 = $0AC4 + $00C0",
+  "WRAM $7E:0AC8 = T84A2[($0109<<1)&$FF]; $0ACA = $0AC8 + T85A2[($0109&$F8)>>2]",
+  "WRAM $7E:0ACC = T9386[$0100]; $0ACE = $0ACC + $0200 (carry in is 0 from REP #$31)",
+  "WRAM $7E:0AD0 = T95E4[$0100]; $0AD2 = $0AD0 + $0200",
+  "WRAM $7E:0AD4 = T9842[$0102]; $0AD6 = T9842[$0104]",
+  "WRAM $7E:0AD8 = T8484[($02C3&3)*2]; $0ADA = $0AD8 + $0100",
+  "WRAM $7E:C00D = old-1; if that is 0: $C00D = ($0A8C in {$B5,$BC}) ? $0017 : $0009",
+  "Only if $C00D hit 0: $7E:C00F = (old+$0400 == $0C00) ? 0 : old+$0400; $7E:0ADC = new $C00F + $A680",
+  "WRAM $7E:C013 = old-1; if that is 0: idx = (low byte of old $C015 + 2) & $FF, idx = 0 if idx == $0C; $7E:C015 = idx (u16, high byte 0); $7E:C013 = T85C2[idx]; $7E:0AE0 = $B280 + T85CE[idx]; $7E:0AE2 = $0AE0 + $0060",
+  "WRAM $7E:0AEC = ($0AE8<<1) + $B940 + bit15($0AE8); $0AEE = $0AEC + $0200 + carry out of the $0AEC add",
+  "WRAM $7E:0AF0/$0AF2: same as above from $0AEA",
+  "WRAM $7E:0AF6 = ($0AF4<<1) + $B540 + bit15($0AF4); $0AF8 = $0AF6 + $0200 + carry out of the $0AF6 add",
+  "Not written: $0ADE, $0AE4-$0AEB, $0AF4/$0AF5 (and $0ADC, $0AE0/$0AE2 only conditionally)",
+  "A/B: 16-bit value stored to $0AF8 (A low, B high after SEP #$20)",
+  "X (u8): last loaded of ($02C3&3)*2, then byte $0A8C if $C00D hit 0, then new $C015 idx if $C013 hit 0",
+  "Y (u8) = ($0109 & $F8) >> 2",
+  "P: M=1, X=1; C and V from the final ADC #$0200 ($0AF8); N/Z from PLD (the restored D, 16-bit); I and decimal unchanged",
+  "D, DB, S unchanged",
+]
 hw_writes = []
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "Part 1 OR's unmasked bytes: any bits above bit 1 in $0A20+4n+k bleed into neighbour fields after the shifts (s3 keeps bits 1-0 only by shift-out; s0 keeps all 8 bits).",
+  "Part 1 stores in descending groups: Y=$1C first (bytes $0A1C-$0A1F), down to Y=0. Final 8-bit Y after the loop is $FC, X=$00 (overwritten later anyway).",
+  "LDX $8C runs with D=$0A00, so the $B5/$BC test reads $7E:0A8C (a sprite ext byte), not $7E:008C. Reproduce the $0A8C read.",
+  "$0AEC/$0AF0/$0AF6 adds have no CLC: carry in is bit 15 of the source word from the ASL. $0AEE/$0AF2/$0AF8 chain the carry out of that add. All other +const adds have C=0 (CLC or REP #$31).",
+  "X is 8-bit for $0109*2: bit 7 of $0109 is dropped from the $84A2 index. $85A2 is indexed by ($0109 & $F8)>>2 (always even, <= $3E).",
+  "$C015 is read through TAX with 8-bit X (high byte lost), INX INX wrap at 8 bits, reset only when the incremented value is exactly $0C: an odd start never resets, an even start above $0A climbs and wraps $FE->$00 before reaching $0C. Written back zero-extended (TXA with 16-bit A).",
+  "$C00F wraps to 0 only on exactly $0C00 after the +$0400; any other start value just keeps adding (16-bit wrap).",
+  "Countdowns DEC first: a start value of 0 becomes $FFFF and does not reload. $0ADC and $0AE0/$0AE2 are untouched on frames where their countdown did not hit 0.",
+  "abs,X table reads with 16-bit X ($0100/$0102/$0104) are unchecked; per 65816 rules an index that crosses $FFFF carries into bank DB+1.",
+  "N/Z at return come from PLD (caller's D), not from the last arithmetic.",
+]
+test_states = [
+  "Part 1: random bytes (full 8-bit, not just 0-3) in $0A20-$0A9F; check all 32 bytes of $0A00-$0A1F, incl. bit bleed.",
+  "Random $0100/$0102/$0104 (even, small, inside ROM tables) and random $0107/$0108/$0109 (incl. $0109 with bit 7 set, and $010A nonzero) and $02C3 (incl. high bits set).",
+  "$C00D = 2 (no reload): $C00F, $0ADC unchanged.",
+  "$C00D = 1 with $0A8C = $B5, $BC, and another value (e.g. $00, and $008C = $B5 to prove the wrong-page read): reload $17/$17/$09.",
+  "$C00D = 1 with $C00F = $0800 (wraps to 0) and = $0000 (-> $0400), plus an off-grid value like $0200 (no wrap) and $FE00.",
+  "$C00D = 0: becomes $FFFF, no reload.",
+  "$C013 = 2 (no reload); $C013 = 1 with $C015 = $000A (wraps to 0), = $0004 (-> 6), = $FF0A (high byte ignored, -> 0, stored $0000), = $0001 (odd, no wrap).",
+  "$0AE8/$0AEA/$0AF4 with bit 15 set and clear, and values where the base add carries (e.g. $0AE8 = $2400 -> $4800+$B940 overflows) to test the chained carry into $0AEE.",
+  "Entry D = $0000 (Z=1 at exit) and D = $8000-style value (N=1) to check PLD flags; DB=$00 in all cases.",
+]
 
 [code]
 file = ""
@@ -42,6 +108,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped from a fresh local trace at m8x8: one range $00:85EC-$00:8757, 181 insns, leaf (no callees, no tables), single RTS at m8x8, no WARN lines. Width transitions and observed quirks recorded in notes."
-uncertain = "DB at entry (absolute table reads and $0A00,Y stores use it); assumed $00. Meanings of $0AC0-$0AF9 pointers and the $7E:C00D-$C015 counters are guesses (likely NMI DMA source addresses / animated-tile timers)."
-next_check = "Spec step: write inputs/outputs from notes (a)-(e); confirm whether DB is guaranteed $00 after modules return (check 0080b5 targets or note DB as an input)."
+done = "Mapped earlier (run-2026-10-10-c). Specced (run-2026-10-10-c, fresh trace matches the map): per-output formulas for $0A00-$0A1F and $0AC0-$0AF8, both countdown paths, final A/X/Y/P, no hw writes, quirks for the $0A8C wrong-page read, carry chains, 8-bit index truncation and exact-match wraps."
+uncertain = "DB=$00 at entry is assumed (Reset never sets it; modules dispatched by 0080b5 not checked for leaving DB changed). Meaning of the pointers and counters is still a guess (likely NMI DMA sources / animated tiles)."
+next_check = "Translate: read ROM tables through DB (bank 00); preserve the conditional writes ($0ADC, $0AE0/$0AE2) and the PLD-derived N/Z. Verify with the test_states, including $008C != $0A8C."

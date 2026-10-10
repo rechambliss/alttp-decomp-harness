@@ -127,3 +127,73 @@ name = "PrepFrameUploads"
 kind = "routine"
 confidence = "guess"
 source = "0085ec map: packs OAM high-table bytes $0A00-$0A1F from $0A20-$0A9F, then builds per-frame upload pointers $0AC0-$0AF9"
+
+[[symbol]]
+address = "$00:8484"
+name = "Tbl_UploadPtr_02C3"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index ($02C3&3)*2 -> $0AD8"
+
+[[symbol]]
+address = "$00:848C"
+name = "Tbl_UploadPtr_0107"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, byte index $0107 -> $0AC0"
+
+[[symbol]]
+address = "$00:849C"
+name = "Tbl_UploadPtr_0108"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, byte index $0108 -> $0AC4"
+
+[[symbol]]
+address = "$00:84A2"
+name = "Tbl_UploadPtr_0109"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index ($0109<<1)&$FF -> $0AC8"
+
+[[symbol]]
+address = "$00:85A2"
+name = "Tbl_UploadOfs_0109"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index ($0109&$F8)>>2, added to $0AC8 -> $0ACA"
+
+[[symbol]]
+address = "$00:85C2"
+name = "Tbl_AnimB_Reload"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index $7E:C015 (0..10) -> reload of $7E:C013"
+
+[[symbol]]
+address = "$00:85CE"
+name = "Tbl_AnimB_Offset"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index $7E:C015 (0..10), + $B280 -> $0AE0"
+
+[[symbol]]
+address = "$00:9386"
+name = "Tbl_UploadPtr_0100a"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index $0100 (u16) -> $0ACC"
+
+[[symbol]]
+address = "$00:95E4"
+name = "Tbl_UploadPtr_0100b"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index $0100 (u16) -> $0AD0"
+
+[[symbol]]
+address = "$00:9842"
+name = "Tbl_UploadPtr_0102"
+kind = "data"
+confidence = "guess"
+source = "0085ec spec: word table, index $0102 -> $0AD4 and $0104 -> $0AD6"
