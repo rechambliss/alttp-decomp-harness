@@ -1,7 +1,7 @@
 id = "0085ec"
 name = "PrepFrameUploads"
 address = "$00:85EC"
-status = "specced"
+status = "translated"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -11,7 +11,9 @@ Part 1 ($85EC-$8643, D=$0A00, saved/restored by PHD/PLD): loop Y = $1C,$18,..,$0
 Part 2 ($8644-$8757, D=$0A00 again, PHD/PLD): builds 16-bit pointers into $0AC0-$0AF9 from table lookups indexed by $0100/$0102/$0104 (16-bit X), $0107/$0108/$0109 and $02C3 (8-bit X), plus two long-addressed animation counters at $7E:C00D/$C00F and $7E:C013/$C015, and three plain derivations from $0AE8/$0AEA/$0AF4. Tables read DB-relative: $9386, $95E4, $9842 (x2), $848C, $849C, $84A2, $85A2, $8484, $85C2, $85CE.
 For the spec step, things noticed (verify against the trace): (a) LDX $8C at $86CC runs with D=$0A00, so it reads $0A8C, not $008C. (b) $0AEC/$0AF0/$0AF6 adds have no CLC: carry comes from the preceding ASL (bit 15 of the source word); the following ADC #$0200 chains carry from that add. $0ACE likewise relies on C=0 from REP #$31. (c) With X 8-bit, the $0109*2 index truncates to 8 bits and $7E:C015 is read through TAX (high byte lost) and written back zero-extended. (d) $7E:C00F wraps to 0 only when it hits exactly $0C00. (e) Absolute reads/writes depend on DB; Reset never sets DB, and DB on return from 0080b5 is assumed to be $00 but not proven here.
 """
-followups = []
+followups = [
+  { address = "$00:85EC", reason = "State has no ROM access. prep_frame_uploads takes ROM reads as an explicit parameter (rom: &dyn Fn(bank, addr) -> u8, type RomRead in the unit file) and has a local Bus for DB-relative 24-bit reads (WRAM, low mirror, ROM). When a shared ROM/bus lands in State (or alttp-core gains an alttp-rom dependency), switch this routine to it and drop the parameter." },
+]
 
 [map]
 bounds = ["$00:85EC-$00:8757"]
@@ -97,8 +99,8 @@ test_states = [
 ]
 
 [code]
-file = ""
-function = ""
+file = "crates/alttp-core/src/bank00/prep_frame_uploads.rs"
+function = "prep_frame_uploads"
 
 [verify]
 fixtures = ""
@@ -108,6 +110,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped earlier (run-2026-10-10-c). Specced (run-2026-10-10-c, fresh trace matches the map): per-output formulas for $0A00-$0A1F and $0AC0-$0AF8, both countdown paths, final A/X/Y/P, no hw writes, quirks for the $0A8C wrong-page read, carry chains, 8-bit index truncation and exact-match wraps."
+done = "Mapped and specced earlier (run-2026-10-10-c). Translated (specced -> translated, run-2026-10-10-c): prep_frame_uploads(s, rom) in bank00/prep_frame_uploads.rs, one statement group per instruction with full N/V/Z/C tracking; spec and asm agree, no discrepancies. Both PHDs push to the real stack (2 bytes below S written). Abs reads go through DB as 24-bit addresses (abs,X carries into DB+1); dp through D. Added wram::addr OAM_BUFFER_HIGH, OAM_EXT_BITS, FRAME_UPLOAD_PTRS, ANIM_TILE_TIMER_A/OFS_A/TIMER_B/IDX_B. Asserts decimal flag clear at entry (binary ADC only). 13 tests with a synthetic hashed ROM (no ROM bytes): 200 random states vs an independent spec-formula model (whole 128 KiB WRAM, A/X/Y/P, S/D/DB), plus each test_state: bit bleed, both timers incl. 0 underflow, $C00F wrap/off-grid/$FE00, $C015 wrap/$FF0A/odd/$FE, $0A8C vs $008C decoy, carry chains, $0109 bit 7 + $010A, PLD N/Z, bank-carry of $9386+X. cargo test -p alttp-core passes (33 tests), clippy clean."
 uncertain = "DB=$00 at entry is assumed (Reset never sets it; modules dispatched by 0080b5 not checked for leaving DB changed). Meaning of the pointers and counters is still a guess (likely NMI DMA sources / animated tiles)."
-next_check = "Translate: read ROM tables through DB (bank 00); preserve the conditional writes ($0ADC, $0AE0/$0AE2) and the PLD-derived N/Z. Verify with the test_states, including $008C != $0A8C."
+next_check = "Verifier: call with a closure over alttp_rom::Rom::read_u8 for the real tables, DB=$00. Diff $0A00-$0A1F, $0AC0-$0AF9, $7E:C00D-$C016 and the 2 stack bytes; include $C00D=1 and $C013=1 frames and a $0A8C=$B5 case with $008C different."
