@@ -1,18 +1,18 @@
 id = "008797"
-name = "sub_008797"
+name = "InitWramAndSram"
 address = "$00:8797"
-status = "unmapped"
+status = "mapped"
 owner = ""
 blocked_reason = ""
-notes = "Called by Reset init ($00:802C, JSR) at m8x8. Single RTS exit at m8x8 per local trace."
+notes = "Called only by Reset init ($00:802C, JSR) at m8x8, D=$0000, S=$01FD after the JSR, DB=$00 (reset value; 0088d8/00885f contain no PLB/MVN/MVP). Leaf routine: no calls, no jumps, no tables. Single RTS exit at m8x8. Body runs at m16x16 (REP #$30 at entry, SEP #$30 before exit). Trace had no WARN lines."
 followups = []
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:8797-$00:8804"]
+mx_entry = "m8x8"
 callees = []
 jump_tables = []
-size_insns = 0
+size_insns = 39
 merged_into = ""
 
 [spec]
@@ -36,6 +36,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped (run-2026-10-10-c). One contiguous leaf block $8797-$8804, 39 insns, entry m8x8, body m16x16, exit m8x8 via RTS. Observations for the spec step: saves 16-bit word $01FE in Y (the caller's JSR return address, since S=$01FF before the JSR); 16-bit zero loop, X=$03FE down to 2 step 2, storing to $0000/$0400/.../$1C00 + X; then 16-bit zero to $7E:C500 and $70:1FFE; for each of $70:03E5, $70:08E5, $70:0DE5, if the word != $55AA it is zeroed; restores $01FE from Y; 16-bit STZ $212E (also hits $212F); SEP #$30; $13 = $80; INC $15."
+uncertain = "Quirk candidate: loop exits at X=0, so bytes $0000-$0001, $0400-$0401, $0800-$0801, ... $1C00-$1C01 are never cleared (8 words). $01FE-$01FF are cleared then restored. Absolute stores rely on DB=$00 (true on the only call path). Meaning of $15, $7E:C500 and $70:1FFE is a guess."
+next_check = "Spec step: confirm the uncleared-word quirk, and that the restore of $01FE is 16-bit (both return-address bytes). The SRAM $55AA words are probably per-save-slot validity markers (slots $500 apart)."

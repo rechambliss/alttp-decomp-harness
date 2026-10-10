@@ -197,3 +197,10 @@ name = "Tbl_UploadPtr_0102"
 kind = "data"
 confidence = "guess"
 source = "0085ec spec: word table, index $0102 -> $0AD4 and $0104 -> $0AD6"
+
+[[symbol]]
+address = "$00:8797"
+name = "InitWramAndSram"
+kind = "routine"
+confidence = "guess"
+source = "008797 map: zeroes WRAM $0002-$1FFF (except first word of each $400 block), clears $7E:C500 and $70:1FFE, invalidates SRAM slot markers not equal to $55AA, sets $13=$80, INC $15"
