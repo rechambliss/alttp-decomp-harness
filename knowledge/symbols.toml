@@ -71,3 +71,17 @@ name = "NMI_UploadIf1F0C"
 kind = "routine"
 confidence = "guess"
 source = "0080c9 map: called from NMI alt path; DMA $7E:E800 -> VRAM $5800 ($0800 bytes) when $1F0C != 0; not yet mapped"
+
+[[symbol]]
+address = "$00:8317"
+name = "IRQ_Return"
+kind = "label"
+confidence = "likely"
+source = "0082d8 map: shared 16-bit pull frame and RTI for IRQ's normal paths"
+
+[[symbol]]
+address = "$00:831F"
+name = "IRQ_ThreadSwitch"
+kind = "label"
+confidence = "likely"
+source = "0082d8 map: IRQ path taken when $012A != 0; acks $4211, swaps S with $1F0A before RTI"

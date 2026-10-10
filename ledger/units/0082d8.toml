@@ -1,18 +1,34 @@
 id = "0082d8"
 name = "IRQ"
 address = "$00:82D8"
-status = "unmapped"
-owner = "run-2026-10-10-a"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Native-mode IRQ vector target, read from header at $00:FFEE."
-followups = []
+notes = """
+Native-mode IRQ vector target, read from header at $00:FFEE.
+Entry width: whatever the interrupted code had (native IRQ pushes P, does not change M/X), so it varies.
+It does not matter: SEI and REP #$30 are width-independent. Traces at m8x8 and m16x16 are identical apart from the header line.
+Same frame as NMI: REP #$30, push A/X/Y (16-bit), D, DB; PHK/PLB sets DB=$00; SEP #$30. D is NOT reset (PHD only, no TCD), unlike NMI. Body runs at m8x8.
+Three paths, all exit by RTI after REP #$30 + PLB/PLD/PLY/PLX/PLA (16-bit pulls):
+- $012A != 0: jump to $00:831F. Reads $4211 (ack), swaps S with the word at $1F0A (TSC/TAX, LDA $1F0A/TCS, STX $1F0A), pulls, RTI at $00:8332.
+  Same thread-switch sequence as NMI's alt path at $00:822D, so it returns into the other stack.
+- $012A == 0 and ($4211 bit 7 clear, or $0128 == 0): straight to the pulls at $00:8317, RTI at $00:831E. The $4211 read is the ack either way.
+- $012A == 0, $4211 bit 7 set, $0128 != 0: spin on $4212 bit 6 (HBlank), write $0630/$0631 to $2111 (BG3HOFS low/high), STZ $2112 twice (BG3VOFS = 0).
+  Then if $0128 bit 7 set: STZ $0128 and $4200 = $81 (NMI + auto-joypad, IRQs off). Falls into the pulls at $00:8317.
+No callees, no jump tables, no indirect jumps. 49 insns, one contiguous range.
+ROM byte search for JMP/JSR/JSL/JML to $82D8/$82E9/$82F3/$8317/$831F in bank $00: only 3 hits, all in data
+(two '22 17 83 00' inside bank $0B tables at $0B:F04D/$0B:F365, one '20 1F 83' at $14:A5FB which would target bank $14). Treated as coincidental.
+"""
+followups = [
+  { address = "$00:80C9", reason = "NMI spec: IRQ is the second half of the $1F0A thread switch. Both NMI ($00:822D) and IRQ ($00:831F) swap S with $1F0A when $012A != 0; the spec for either should describe the pair together." },
+]
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:82D8-$00:8332"]
+mx_entry = "varies: see notes"
 callees = []
 jump_tables = []
-size_insns = 0
+size_insns = 49
 merged_into = ""
 
 [spec]
@@ -36,6 +52,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped IRQ from a fresh local trace: one range $00:82D8-$8332, three RTI paths (ack-only, BG3 scroll split at HBlank driven by $0128/$0630, and the $012A stack swap with $1F0A). No callees or tables."
+uncertain = "What sets $0630/$0631 and the bit-7 meaning of $0128 (one-shot IRQ that turns itself off). Whether the ROM byte-search hits are all data (they look like it)."
+next_check = "Spec step: hw order matters ($4211 read first, $4212 poll, $2111 x2, $2112 x2, then $4200). D is not reset to 0, but the body uses only absolute addressing so D is irrelevant. The $4212 spin needs a test state where HBlank is already set or the harness models it."
