@@ -4,6 +4,7 @@ One line per address or range. Grep for the address, don't read the whole file.
 Format: `$7E:XXXX  size  NAME  confidence  meaning  (unit that established it)`
 
 <!-- entries below, sorted by address -->
+$7E:0000  2  SCRATCH_00  guess  General temporaries; 0083d1 parks raw $4218/$4219 in $00/$01 before copying out  (0083d1)
 $7E:0003  3  DISPATCH_PTR  likely  24-bit target (lo/hi/bank) built from three byte tables, then jumped through by 0080b5 (JML [$0003]); left holding the current module's entry address  (008000, 0080b5)
 $7E:0010  1  MODULE_INDEX  likely  Y index into the dispatch tables at $00:8061/$807D/$8099; 28 entries, valid $00-$1B, no bounds check  (008000, 0080b5)
 $7E:0012  1  FRAME_READY  likely  Main loop spins while zero, clears it after each pass (after 0085ec, so a set during frame work is lost: lag frame). Set by NMI: INC when zero, and only then NMI runs 0089e0 and 0083d1  (008000, 0080c9)
@@ -16,7 +17,12 @@ $7E:0096  9  WINDOW_CMATH_MIRROR  likely  $96-$98 -> $2123-$2125, $99/$9A -> $21
 $7E:009B  1  HDMAEN_MIRROR  likely  Written to $420C last in both NMI paths ($420C is zeroed at NMI start)  (0080c9)
 $7E:00E4  2  BG3HOFS_MIRROR  likely  $E4/$E5 -> $2111 (low, high)  (0080c9)
 $7E:00EA  2  BG3VOFS_MIRROR  likely  $EA/$EB -> $2112 (low, high)  (0080c9)
-$7E:00F6  1  JOY1_NEW_HI  guess  Read only by dead code at $00:803B (bits 5 and 4 tested); probably a joypad new-press byte  (00803b)
+$7E:00F0  1  JOY1_HELD_BYSTUDLR  likely  Raw $4219 (JOY1H) this frame: B Y Select Start Up Down Left Right, bit 7..0  (0083d1)
+$7E:00F2  1  JOY1_HELD_AXLR  likely  Raw $4218 (JOY1L) this frame: A X L R in bits 7..4  (0083d1)
+$7E:00F4  1  JOY1_NEW_BYSTUDLR  likely  Newly pressed this frame: ($4219 XOR old $F8) AND $4219  (0083d1)
+$7E:00F6  1  JOY1_NEW_AXLR  likely  Newly pressed this frame: ($4218 XOR old $FA) AND $4218; bits 5/4 = L/R, tested by dead code at $00:803B  (0083d1, 00803b)
+$7E:00F8  1  JOY1_PREV_BYSTUDLR  likely  Copy of $F0, kept as the previous frame's value for $F4  (0083d1)
+$7E:00FA  1  JOY1_PREV_AXLR  likely  Copy of $F2, kept as the previous frame's value for $F6  (0083d1)
 $7E:00FF  1  ALT_IRQ_VTIME  guess  NMI alt path writes it to $4209 (VTIMEL) with $420A=0 before enabling V-IRQ  (0080c9)
 $7E:011E  8  BG_SCROLL_MIRROR  likely  $0120/21 -> $210D BG1HOFS, $0124/25 -> $210E BG1VOFS, $011E/1F -> $210F BG2HOFS, $0122/23 -> $2110 BG2VOFS  (0080c9)
 $7E:0128  1  IRQ_ENABLE_REQ  guess  When nonzero NMI acks $4211, sets V-IRQ at line $80 and writes $4200=$A1. IRQ does the BG3 scroll split only when nonzero and $4211 bit 7 set; bit 7 of $0128 set makes the split one-shot (IRQ clears $0128 and writes $4200=$81), bit 7 clear repeats every frame  (0080c9, 0082d8)

@@ -1,18 +1,25 @@
 id = "0083d1"
 name = "ReadJoypad"
 address = "$00:83D1"
-status = "unmapped"
+status = "mapped"
 owner = ""
 blocked_reason = ""
-notes = "Called from NMI at $00:8141, m8x8, only when $12 was zero. Tool trace: 20 insns, straight line, reads $4218/$4219, RTS at m8x8."
+notes = """
+Only caller: JSR at $00:8141 in NMI (0080c9), at m8x8, only on the path where $12 was zero (after 0089e0 returns).
+ROM byte search of bank 00 for JSR/JMP/JML/JSR (abs,X)/JMP (abs,X) with operand $83D1 finds only $00:8141; no JSL hits in the whole ROM.
+Straight-line leaf: no branches, no callees, no tables, no width changes (no REP/SEP). Single exit RTS at $00:83F8, m8x8.
+Width-sensitive: all loads/stores and TAY/STY assume M=1, X=1 (8-bit). NMI's 0089e0 return width is still an open followup on 0080c9.
+Merge decision: not merged into 0080c9. 20 insns is not under the ~20 threshold, 0080c9 is already specced with 0083d1 as a stubbed callee, and pointer-table references are not ruled out. Same call as the 0080c9 map.
+Touches: STZ $4016 (JOYSER0), reads $4218/$4219 (JOY1L/JOY1H auto-read), writes dp $00/$01, $F0/$F2/$F4/$F6/$F8/$FA, reads old $F8/$FA.
+"""
 followups = []
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:83D1-$00:83F8"]
+mx_entry = "m8x8"
 callees = []
 jump_tables = []
-size_insns = 0
+size_insns = 20
 merged_into = ""
 
 [spec]
@@ -36,6 +43,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped (unmapped -> mapped, run-2026-10-10-c). Bounds $00:83D1-$00:83F8, 20 insns, m8x8 throughout, single RTS, no callees, no tables. One caller ($00:8141 in NMI). Kept as its own unit (see notes). Added RAM entries for $F0/$F2/$F4/$F8/$FA and renamed $F6 (its source is $4218 = JOY1L, so the old JOY1_NEW_HI name was wrong)."
+uncertain = "Direct-page addressing: stores go to D+$00 etc. NMI is assumed to run with D=$0000 here; the spec step should confirm D at the call site in 0080c9. Whether $00/$01 are scratch depends on later readers; they look like plain temporaries."
+next_check = "Spec: new-press formula is (new XOR old) AND new per byte; old held values come from $F8/$FA before they are overwritten. Exit A = $F4 value, Y = raw $4219, X untouched. STZ $4016 happens before the reads."

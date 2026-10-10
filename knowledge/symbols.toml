@@ -62,8 +62,8 @@ source = "0080c9 map: NMI path taken when $012A != 0; swaps S with $1F0A before 
 address = "$00:83D1"
 name = "ReadJoypad"
 kind = "routine"
-confidence = "guess"
-source = "0080c9 map: called from NMI; reads auto-joypad $4218/$4219 into $F0-$FA; not yet mapped as its own unit"
+confidence = "likely"
+source = "0083d1 map: STZ $4016, reads auto-joypad $4218/$4219 into held ($F0/$F2), new-press ($F4/$F6) and previous ($F8/$FA) bytes; only caller NMI $00:8141"
 
 [[symbol]]
 address = "$00:89E0"
