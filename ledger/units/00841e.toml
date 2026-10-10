@@ -1,7 +1,7 @@
 id = "00841e"
 name = "ClearOamBuffer"
 address = "$00:841E"
-status = "specced"
+status = "translated"
 owner = ""
 blocked_reason = ""
 notes = "Called by Reset main loop ($00:8053, JSR) at m8x8. Single RTS exit at m8x8. Straight-line leaf: PHD, then 4 passes (X = $60,$40,$20,$00; loop exits when X goes to $E0) that set D = $0800 then D = $0900 and store $F0 to 16 dp,X offsets each ($01,$05,..,$1D and $81,$85,..,$9D). Net effect: every 4th byte $0801..$08FD and $0901..$09FD = $F0, i.e. the Y byte of all 128 OAM entries in the low-table buffer. PLD, RTS. M/X stay m8x8 throughout. 51 insns, no callees, no tables: no split or merge."
@@ -51,8 +51,8 @@ test_states = [
 ]
 
 [code]
-file = ""
-function = ""
+file = "crates/alttp-core/src/bank00/clear_oam_buffer.rs"
+function = "alttp_core::bank00::clear_oam_buffer::clear_oam_buffer"
 
 [verify]
 fixtures = ""
@@ -62,6 +62,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Specced (mapped -> specced). Re-dumped and confirmed the map: straight-line leaf, m8x8 throughout, only memory effect is $F0 into the 128 OAM Y bytes $7E:0801+4n. No hw writes, no scratch."
-uncertain = "Corrected the map handoff's exit flags: PLD sets N/Z from the restored D, so N/Z depend on entry D (Z=1 N=0 for Reset's D=0). Whether any caller reads exit A/X/flags is unchecked; Reset's next call is JSL 0080b5, which reloads A and Y."
-next_check = "Translator: implement as a plain loop over the 128 Y bytes plus the exit register/flag state in [spec].outputs. Verifier: diff $0700-$0BFF plus A, X, D, P."
+done = "Translated (specced -> translated, run-2026-10-10-c). Instruction-level translation in clear_oam_buffer.rs: PHD, 4-pass loop with XBA/TCD setting D=$0800/$0900, 16 dp,X stores each, TXA/SEC/SBC #$20/TAX/BPL, PLD. Spec and assembly agree, including exit A=$09E0, X=$E0, C=0, V=0, N/Z from restored D. Added wram::addr::OAM_BUFFER_LOW = $0800 (already in ram-map.md). 3 tests cover all test_states; cargo test -p alttp-core passes."
+uncertain = "SBC is modelled in binary mode only (P.D assumed clear, as the game never runs with decimal on). With P.D set the original would exit A=$0980, X=$80. Return address/PC is not modelled (JSR/RTS treated as a Rust call)."
+next_check = "Verifier: diff $0700-$0BFF plus A, X, Y, D, S, P against the original with D=$0000 and a nonzero D. Write order is pass X=$60,$40,$20,$00, each $08xx then $09xx."
