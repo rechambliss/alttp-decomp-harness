@@ -1,7 +1,7 @@
 id = "008000"
 name = "Reset"
 address = "$00:8000"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -33,13 +33,57 @@ size_insns = 32
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
-hw_writes = []
+summary = """
+Cold-start entry. With IRQs masked, disables NMI/IRQ/auto-joypad, HDMA and DMA, zeroes the four APU ports and forces blank.
+Switches to native mode, clears decimal, sets D=$0000 and S=$01FF, then runs two init calls (0088d8, 008797) at m8x8.
+Enables NMI plus auto-joypad read ($4200=$81) and enters an endless loop: spin until $12 is nonzero, CLI,
+bump the frame counter $1A, run 00841e, the module dispatcher 0080b5 (JSL) and 0085ec, clear $12, repeat. Never returns.
+"""
+inputs = [
+  "CPU reset state: E=1, M=1, X=1, I=1, PB=$00, DB=$00 (forced by hardware)",
+  "WRAM $7E:0012 FRAME_READY (u8), read via DP $12 each wait iteration",
+  "WRAM $7E:001A FRAME_COUNTER (u8), read-modify-write once per pass",
+]
+outputs = [
+  "E=0 (native), M=1, X=1, D flag=0, I=1 during init then I=0 from the first loop pass on",
+  "D register = $0000, S = $01FF (set once, then balanced by the calls)",
+  "B (high byte of A) = $01 at the first call to 0088d8, left over from LDA #$01FF",
+  "DB not written here; stays $00 from reset",
+  "WRAM $7E:001A FRAME_COUNTER += 1 per pass (8-bit wrap)",
+  "WRAM $7E:0012 FRAME_READY = 0 at the end of each pass",
+]
+hw_writes = [
+  "$4200 NMITIMEN = $00",
+  "$420C HDMAEN = $00",
+  "$420B MDMAEN = $00",
+  "$2140 APUIO0 = $00",
+  "$2141 APUIO1 = $00",
+  "$2142 APUIO2 = $00",
+  "$2143 APUIO3 = $00",
+  "$2100 INIDISP = $80 (forced blank, brightness 0)",
+  "(callees 0088d8 then 008797 run here)",
+  "$4200 NMITIMEN = $81 (NMI on, auto-joypad read on, H/V IRQ off)",
+  "Order matters: all writes above happen with I=1, before any call, and $4200=$81 comes after both init calls.",
+]
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "REP #$28 clears both M and the decimal flag; X stays 8-bit the whole time (no 16-bit index use).",
+  "B is left at $01 by LDA #$01FF/TCS and is not cleared by SEP #$30. Reproduce it: 0088d8 is entered with A=$01FF (16-bit view).",
+  "DB is never set by Reset. DP accesses to $12/$1A hit the low-WRAM mirror at $00:0012/$00:001A.",
+  "CLI runs on every loop pass, not once. IRQs stay masked through all of init and until $12 first becomes nonzero.",
+  "$1A is incremented before the frame work, so the first pass sees $1A = initial+1.",
+  "STZ $12 comes after 0085ec. If $12 is set again while the frame work is still running (lag frame), that set is wiped and the loop waits for the next one. Keep this lag behavior.",
+  "The BRA at $00:8039 always skips $00:803B-$8050. Do not translate those bytes as part of Reset.",
+  "Callees are assumed to return with M=1, X=1 (open followups on 0080b5 and 00885f). Reset does no SEP before using $12/$1A after the calls.",
+]
+test_states = [
+  "Cold reset from power-on state (E=1, M=X=I=1): check the hw write sequence and CPU state (E, P, D, S, A incl. B) at the first JSR $88D8. Stop condition for the init half.",
+  "Callees stubbed to RTS/RTL at m8x8: run until the first arrival at $00:8034, check $4200=$81 written last and I still set.",
+  "Loop with $12 = 0 and NMI held off: N wait iterations, no RAM or hw writes, $1A unchanged.",
+  "Loop with $12 = nonzero at entry to $00:8034: one pass; $1A += 1, $12 = 0, I cleared, callees called in order 00841e, 0080b5, 0085ec.",
+  "$1A = $FF before a pass: wraps to $00.",
+  "$12 set by a stub inside 0085ec (simulated lag): after the pass $12 = 0 and the loop spins again.",
+]
 
 [code]
 file = ""
@@ -53,6 +97,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped Reset: bounds, entry width, mode switch, stack and DP setup, main loop shape, 5 callees with unit files created."
-uncertain = "Return widths of 0080b5 (indirect JML into modules) and 0088d8 (via 00885f) are not yet confirmed. Reset's loop assumes m8x8 after both. Whether $00:803B-$8050 is truly dead is unchecked."
-next_check = "Spec session for 008000. Resolve the 0080b5 and 00885f followups before 008000 is translated. Verifier: Reset never returns, so the harness needs a stop condition (e.g. first arrival at $00:8034, or N loop iterations)."
+done = "Specced Reset from a fresh local trace (matches the map). Hw write order, CPU state at the first call (incl. B=$01, DB untouched), loop order and lag-frame behavior written up."
+uncertain = "Still assumes every callee returns at m8x8 (0080b5 modules via RTL, 0088d8 via 00885f). Who sets $12 is unconfirmed (probably NMI, unit 0080c9). Whether $00:803B-$8050 is reachable from elsewhere is still unchecked."
+next_check = "Translator: model Reset as init() plus a loop step fn so tests can stop at $00:8034 or after N passes; stub callees. Resolve the 0080b5 and 00885f followups before 008000 is verified. Verifier needs O-001."

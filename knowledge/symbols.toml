@@ -31,6 +31,13 @@ confidence = "likely"
 source = "008000 map: endless loop that waits on $12, then runs one frame of work"
 
 [[symbol]]
+address = "$00:8051"
+name = "Reset_FrameBody"
+kind = "label"
+confidence = "likely"
+source = "008000 spec: one pass of per-frame work (INC $1A, 00841e, 0080b5, 0085ec, clear $12)"
+
+[[symbol]]
 address = "$00:80B5"
 name = "MainModuleDispatch"
 kind = "routine"
