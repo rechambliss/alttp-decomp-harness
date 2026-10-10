@@ -120,3 +120,10 @@ name = "ClearOamBuffer"
 kind = "routine"
 confidence = "likely"
 source = "00841e map: sets Y byte of all 128 OAM buffer entries ($0801+4n) to $F0 (offscreen); called once per frame by Reset main loop"
+
+[[symbol]]
+address = "$00:85EC"
+name = "PrepFrameUploads"
+kind = "routine"
+confidence = "guess"
+source = "0085ec map: packs OAM high-table bytes $0A00-$0A1F from $0A20-$0A9F, then builds per-frame upload pointers $0AC0-$0AF9"
