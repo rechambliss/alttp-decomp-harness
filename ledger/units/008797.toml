@@ -1,7 +1,7 @@
 id = "008797"
 name = "InitWramAndSram"
 address = "$00:8797"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = "Called only by Reset init ($00:802C, JSR) at m8x8, D=$0000, S=$01FD after the JSR, DB=$00 (reset value; 0088d8/00885f contain no PLB/MVN/MVP). Leaf routine: no calls, no jumps, no tables. Single RTS exit at m8x8. Body runs at m16x16 (REP #$30 at entry, SEP #$30 before exit). Trace had no WARN lines."
@@ -16,13 +16,59 @@ size_insns = 39
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
-hw_writes = []
+summary = """
+Reset-time clear of low WRAM plus SRAM sanity fixes. Saves the word at $01FE (its own return address) in Y, then zeroes $7E:0000-$1FFF
+with a 16-bit loop over 8 parallel $400-byte blocks (X = $03FE down to 2), which skips the first word of each block.
+Zeroes the words $7E:C500 and $70:1FFE. For each save slot marker word $70:03E5/$70:08E5/$70:0DE5, zeroes it unless it equals $55AA.
+Restores $01FE from Y, writes 16-bit 0 to $212E/$212F, then in 8-bit mode sets $13 = $80 and increments $15 (0 -> 1).
+Entry and exit m8x8, body m16x16. Single RTS. Absolute stores rely on DB=$00 and dp stores on D=$0000.
+"""
+inputs = [
+  "M=1, X=1 at entry; D=$0000, DB=$00 (reset values on the only call path, Reset init $00:802C)",
+  "WRAM $7E:01FE (u16): caller's JSR return address, saved and restored",
+  "SRAM $70:03E5 (u16) slot 1 marker, compared to $55AA",
+  "SRAM $70:08E5 (u16) slot 2 marker, compared to $55AA",
+  "SRAM $70:0DE5 (u16) slot 3 marker, compared to $55AA; also decides final B and C",
+  "WRAM words $7E:0000, $0400, $0800, $0C00, $1000, $1400, $1800, $1C00 (u16 each): not touched, pass through",
+  "A, X, Y on entry: not read (all overwritten)",
+  "V, D, I flags: not touched, pass through",
+]
+outputs = [
+  "WRAM $7E:0002-$03FF, $0402-$07FF, $0802-$0BFF, $0C02-$0FFF, $1002-$13FF, $1402-$17FF, $1802-$1BFF, $1C02-$1FFF = $00, except as below",
+  "WRAM $7E:01FE-$01FF = their original values (zeroed by the loop, then restored 16-bit from Y)",
+  "WRAM $7E:0013 INIDISP_MIRROR = $80",
+  "WRAM $7E:0015 UNKNOWN_15 = $01 (zeroed by loop, then INC)",
+  "WRAM $7E:C500-$C501 = $0000",
+  "SRAM $70:1FFE-$1FFF = $0000",
+  "SRAM $70:03E5 (u16) = unchanged if it was $55AA, else $0000; same rule for $70:08E5 and $70:0DE5 independently",
+  "A low byte = $80; B (A high byte) = $55 if $70:0DE5 was $55AA, else $00",
+  "X = $00 (XH cleared by SEP #$30)",
+  "Y = low byte of the original $01FE word (YH cleared by SEP #$30)",
+  "N=0, Z=0 (from INC $15 result $01)",
+  "C = 1 if original $70:0DE5 word >= $55AA unsigned, else 0 (from the last CMP; nothing after it touches C)",
+  "M=1, X=1 at exit",
+]
+hw_writes = [
+  "$212E TMW <- $00 and $212F TSW <- $00 (single 16-bit STZ $212E, low byte to $212E first), after all WRAM/SRAM work",
+]
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "Loop runs X = $03FE down to 2 and exits at X=0 without storing, so the words at $0000, $0400, $0800, $0C00, $1000, $1400, $1800, $1C00 (16 bytes total) are never cleared. Reproduce; do not clear them.",
+  "The loop zeroes the whole stack page including the return address at $01FE-$01FF; only that word is restored. Anything else the caller had on the stack ($0100-$01FD) is wiped. On the real path S=$01FD so nothing else is live.",
+  "Stores to $0000-$1FFF use bank-0 absolute addressing; they hit WRAM only because DB=$00 (low-RAM mirror).",
+  "$13 and $15 are written after the clear, so their final values are fixed ($80, $01) regardless of prior contents.",
+  "SRAM markers are only invalidated (zeroed), never set. Each of the three slots is checked independently.",
+  "Leftover register state is observable: B depends on the last SRAM marker and C on the last CMP. Reproduce exactly.",
+  "STZ $212E is 16-bit, so it also writes $212F.",
+]
+test_states = [
+  "All three SRAM markers = $55AA: no marker writes; B=$55, C=1.",
+  "All three markers != $55AA (e.g. $0000, $1234, $FFFF): all three zeroed; B=$00; C=1 for $FFFF (>= $55AA), C=0 for $1234 or $0000.",
+  "Mixed: slot 1 = $55AA, slot 2 = $AA55, slot 3 = $55AA -> only slot 2 zeroed; covers each branch both ways across states.",
+  "Fill $7E:0000-$1FFF and $7E:C500/$70:1FFE with random nonzero bytes to confirm the 8 untouched words keep their values and everything else in range clears.",
+  "Vary the $01FE word (e.g. $802E, $ABCD) to check the restore and the Y low byte.",
+  "Random V, D, I flags and random A/X/Y on entry to confirm pass-through and overwrite.",
+]
 
 [code]
 file = ""
@@ -36,6 +82,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped (run-2026-10-10-c). One contiguous leaf block $8797-$8804, 39 insns, entry m8x8, body m16x16, exit m8x8 via RTS. Observations for the spec step: saves 16-bit word $01FE in Y (the caller's JSR return address, since S=$01FF before the JSR); 16-bit zero loop, X=$03FE down to 2 step 2, storing to $0000/$0400/.../$1C00 + X; then 16-bit zero to $7E:C500 and $70:1FFE; for each of $70:03E5, $70:08E5, $70:0DE5, if the word != $55AA it is zeroed; restores $01FE from Y; 16-bit STZ $212E (also hits $212F); SEP #$30; $13 = $80; INC $15."
-uncertain = "Quirk candidate: loop exits at X=0, so bytes $0000-$0001, $0400-$0401, $0800-$0801, ... $1C00-$1C01 are never cleared (8 words). $01FE-$01FF are cleared then restored. Absolute stores rely on DB=$00 (true on the only call path). Meaning of $15, $7E:C500 and $70:1FFE is a guess."
-next_check = "Spec step: confirm the uncleared-word quirk, and that the restore of $01FE is 16-bit (both return-address bytes). The SRAM $55AA words are probably per-save-slot validity markers (slots $500 apart)."
+done = "Specced (run-2026-10-10-c). Re-traced $8797-$8804 and confirmed the map: 39 insns, leaf, m8x8 in/out, m16x16 body. Confirmed the 8 uncleared words ($0000, $0400, ... $1C00) and that $01FE is restored 16-bit (both return-address bytes). Spec lists exact register/flag exit state (A=B:$80 with B from last SRAM marker, X=0, Y=low byte of saved $01FE, N=Z=0, C from last CMP)."
+uncertain = "Meaning of $15, $7E:C500, $70:1FFE remains a guess; does not affect translation. Whether the SRAM $55AA words are slot validity markers is inferred from spacing only."
+next_check = "Translator: write the loop with the exact skip (X from $3FE down to 2), do the restore after the clear, and keep the final register/flag state including B and C. Verifier: seed the 8 skipped words and the $01FE word with nonzero values."
