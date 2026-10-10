@@ -1,7 +1,7 @@
 id = "0080c9"
 name = "NMI"
 address = "$00:80C9"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -27,6 +27,8 @@ followups = [
   { address = "$00:83D1", reason = "Merge candidate into 0080c9: 20 insns, one direct caller ($00:8141). Kept separate because it is not under 20 and indirect references were not ruled out." },
   { address = "$00:9337", reason = "Merge candidate into 0080c9: 20 insns, one direct caller ($00:822D). Kept separate for the same reason as 0083d1." },
   { address = "$00:82D8", reason = "IRQ also touches $1F0A (at $00:8327/$832B). The NMI alt path swaps S with $1F0A; the spec step should read IRQ's use to describe the thread switch correctly." },
+  { address = "$09:F7FB", reason = "ROM byte search (unconfirmed, may be data): only STA $1F0A outside NMI/IRQ. Likely the thread setup that seeds the alt stack. Confirm when mapped." },
+  { address = "$0C:C2F6", reason = "ROM byte search (unconfirmed): writers of $012A, e.g. STA at $0C:C2F6/$C391/$CA18/$CB14, $1E:CDE3/$CE28; STZ at $02:99CF/$9A22/$A1A4, $0C:C20B/$C235/$CD03/$EE0C/$EE22; INC at $02:98EC. Find who enables the alt thread." },
 ]
 
 [map]
@@ -38,14 +40,87 @@ size_insns = 213
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
-hw_writes = []
-scratch = []
-quirks = []
-test_states = []
-
+summary = """
+Vblank handler. Saves A/X/Y (16-bit), D, DB; sets D=$0000, DB=$00; body at m8x8. Acks NMI ($4210), then services the 4 APU ports from queues $012C-$012F.
+Forces blank and stops HDMA. If $12 == 0: sets $12 = 1 and runs 0089e0 (VRAM/DMA updates) then 0083d1 (joypad). If $12 was nonzero (lag frame) both are skipped.
+Normal path ($012A == 0): copies PPU mirrors to window/color-math/TM/scroll/BGMODE regs, Mode 7 center regs when BG mode is 7, re-arms V-IRQ at line $80 when $0128 != 0,
+then restores INIDISP from $13 and HDMAEN from $9B and returns to the interrupted code.
+Alt path ($012A != 0): runs 009337, always arms V-IRQ at line [$FF], copies a subset of the PPU mirrors, then swaps S with $1F0A and returns into the other thread.
+"""
+inputs = [
+  "CPU state of the interrupted code: A, X, Y (full 16 bits), D, DB, P, PB:PC (all pushed or on the stack, restored on exit)",
+  "S at entry (the native interrupt frame P, PCL, PCH, PB is already on the stack)",
+  "HW read $4210 RDNMI (ack, value discarded)",
+  "HW read $2140 APUIO0 (only when $012C == 0), $2141 APUIO1 (only when $012D == 0)",
+  "HW read $4211 TIMEUP (ack, value discarded; normal path only, only when $0128 != 0)",
+  "WRAM $7E:012C/$012D APU_QUEUE_0_1 (u8 each), $7E:012E/$012F APU_QUEUE_2_3 (u8 each)",
+  "WRAM $7E:0131 (u8), $7E:0133 APU_LAST_PORT0 (u8)",
+  "WRAM $7E:0012 FRAME_READY (u8)",
+  "WRAM $7E:012A NMI_ALT_THREAD (u8): path select",
+  "WRAM $7E:0013 INIDISP_MIRROR, $7E:009B HDMAEN_MIRROR (u8), both paths",
+  "WRAM $7E:0096-$009E except $9B (u8 each), $7E:001C-$001F (u8 each), $7E:011E-$0125 (u8 each), $7E:00E4/$00E5, $7E:00EA/$00EB: both paths",
+  "WRAM $7E:0094/$0095 BGMODE/MOSAIC mirrors, $7E:0638-$063B M7 center, $7E:0128 IRQ_ENABLE_REQ: normal path only",
+  "WRAM $7E:00FF ALT_IRQ_VTIME (u8), $7E:1F0A ALT_THREAD_SP (u16), and the other thread's 13-byte frame at [$1F0A]+1: alt path only",
+]
+outputs = [
+  "Normal path: A, X, Y, D, DB, P, PB:PC and S restored exactly to the interrupted values (RTI). Body never changes them on exit.",
+  "Alt path: S = old [$1F0A] + 13; A, X, Y, D, DB, P, PB:PC are pulled from that other stack. [$1F0A] = S after the 9-byte push (entry S - 9).",
+  "WRAM $7E:012C = 0 if it was nonzero and differed from $0133; unchanged otherwise",
+  "WRAM $7E:0133 = $012C and $7E:0130 = $012C (only if $012C < $F2) when $012C was sent",
+  "WRAM $7E:012D = 0 and $7E:0131 = old $012D when $012D was nonzero",
+  "WRAM $7E:012E = 0, $7E:012F = 0 always",
+  "WRAM $7E:0012 = 1 if it was 0 (via INC), else unchanged",
+  "Plus everything written by 0089e0 and 0083d1 (when $12 was 0) or 009337 (alt path)",
+]
+hw_writes = [
+  "Order matters. Common prefix, both paths:",
+  "$2140 APUIO0: = $012C if $012C != 0 and != $0133; else = $00 if $012C == 0 and $2140 readback == $0133; else no write",
+  "$2141 APUIO1: = $012D if $012D != 0; else = $00 if $2141 readback == $0131; else no write",
+  "$2142 APUIO2 = $012E, $2143 APUIO3 = $012F (always)",
+  "$2100 INIDISP = $80 (forced blank)",
+  "$420C HDMAEN = $00",
+  "(0089e0 then 0083d1 run here when $12 was 0)",
+  "Normal path, in order: $2123 W12SEL=$96, $2124 W34SEL=$97, $2125 WOBJSEL=$98, $2130 CGWSEL=$99, $2131 CGADSUB=$9A, $2132 COLDATA x3 = $9C,$9D,$9E,",
+  "  $212C TM=$1C, $212D TS=$1D, $212E TMW=$1E, $212F TSW=$1F, $210D BG1HOFS x2 = $0120,$0121, $210E BG1VOFS x2 = $0124,$0125,",
+  "  $210F BG2HOFS x2 = $011E,$011F, $2110 BG2VOFS x2 = $0122,$0123, $2111 BG3HOFS x2 = $E4,$E5, $2112 BG3VOFS x2 = $EA,$EB,",
+  "  $2106 MOSAIC=$95, $2105 BGMODE=$94,",
+  "  if ($94 & 7) == 7: $211C M7B x2 = 0, $211D M7C x2 = 0, $211F M7X x2 = $0638,$0639, $2120 M7Y x2 = $063A,$063B,",
+  "  if $0128 != 0: (read $4211) $4209 VTIMEL=$80, $420A VTIMEH=0, $4207 HTIMEL=0, $4208 HTIMEH=0, $4200 NMITIMEN=$A1,",
+  "  $2100 INIDISP=$13, $420C HDMAEN=$9B",
+  "Alt path, in order: (009337 runs first) $4209 VTIMEL=$FF, $420A VTIMEH=0, $4200 NMITIMEN=$A1,",
+  "  then the same list as the normal path from $2123 through $2112 (no $2106/$2105, no Mode 7, no $0128 block), then $2100 INIDISP=$13, $420C HDMAEN=$9B",
+]
+scratch = [
+  "Stack bytes entry S-8..entry S (the 9-byte A/X/Y/D/DB push frame): dead after the normal-path RTI. On the alt path they stay live as the saved frame of the suspended thread, so do not ignore them there.",
+]
+quirks = [
+  "SEI is redundant (native interrupt entry already sets I). Keep it; it has no observable effect.",
+  "SEP #$30 after the pushes zeroes the high bytes of X and Y. Harmless: the 16-bit pulls restore them.",
+  "Port 0: if $012C is nonzero but equal to $0133 (same value as last sent), nothing is written AND $012C is not cleared; the request stays pending every NMI until $0133 changes.",
+  "Port 0: $0130 is updated only for values < $F2, but $0133 is updated for every sent value.",
+  "Port 0/1 echo clear: with an empty queue, if the APU port reads back the last sent value, the port is written with 0. Port 1 has no equal-to-last check on the send side (always sends a nonzero $012D).",
+  "Ports 2/3 are written every NMI, including 0 when the queue is empty.",
+  "$12 is only INC'd from 0, so it becomes exactly 1. On a lag frame ($12 still nonzero) 0089e0 and 0083d1 are skipped entirely, but the APU, forced-blank and the rest of the body still run.",
+  "Forced blank ($2100=$80) and HDMAEN=0 are written before the $12 check and before the path split; INIDISP and HDMAEN are restored only at the very end, so the whole body runs in forced blank.",
+  "Callees assumed to return at m8x8 (0089e0 is still unmapped, its table at $00:8C6E is undecoded). NMI does LDA $012A right after 0083d1 with no SEP.",
+  "Mode 7 block writes only M7B/M7C (zeroed) and M7X/M7Y. M7A ($211B) and M7D ($211E) are not touched here.",
+  "Normal path writes $2106 before $2105 and tests the BG mode value just written (A from $94), not a reread.",
+  "V-IRQ arm differs: normal path uses line $80, sets HTIME=0 and acks $4211 first; alt path uses line [$FF], does not ack $4211, does not write $4207/$4208, and arms regardless of $0128.",
+  "Alt path thread switch: S <- [$1F0A], [$1F0A] <- S (after the 9-byte push). The pulls and RTI then consume the other thread's frame. IRQ's $012A path does the same swap, so each NMI/IRQ while $012A != 0 toggles between two stacks. Writers of $1F0A/$012A outside NMI/IRQ are unmapped (see followups).",
+  "The 13-byte frame layout (top to bottom: DB, D lo/hi, Y lo/hi, X lo/hi, A lo/hi, P, PCL, PCH, PB) must match exactly for the swap to work; the RTI is native (4-byte frame).",
+]
+test_states = [
+  "Normal path baseline: $012A=0, $12=1 (lag, skips callees), $0128=0, $94=$01. Check full hw write order and exact restore of A/X/Y (16-bit values with nonzero high bytes), D!=0, DB!=0, P with M=0/X=0 at entry.",
+  "Entry with interrupted P at m8x8 and at m16x16: identical behavior, P restored by RTI.",
+  "$12=0: INC to 1, callees 0089e0 then 0083d1 called (stub as RTS at m8x8).",
+  "APU port 0 cases: $012C=0 with $2140 readback == $0133 (writes 0) and != $0133 (no write); $012C=$0133 nonzero (no write, $012C kept); $012C=$10 != $0133 (sent, $0130=$10, cleared); $012C=$F2 ($0130 unchanged).",
+  "APU port 1 cases: $012D=0 with $2141 readback == $0131 and != $0131; $012D nonzero.",
+  "Ports 2/3: nonzero $012E/$012F are sent and cleared; zero values still written.",
+  "BG mode 7: $94=$07 and $94=$0F (low 3 bits 7) take the Mode 7 block; $94=$06 does not.",
+  "$0128 nonzero: $4211 read and V-IRQ registers in order, $4200=$A1. $0128=0: none of these.",
+  "Alt path: $012A=1, $1F0A pointing at a prepared 13-byte frame in another stack area. Check $4209=[$FF] sequence, no $2105/$2106/Mode 7 writes, new S, [$1F0A] = entry S - 9, and registers/PC pulled from the prepared frame.",
+  "Alt path with $12=0 and $0128 nonzero: callees run before the split; $0128 is ignored.",
+]
 [code]
 file = ""
 function = ""
@@ -58,6 +133,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped NMI from a fresh local trace: one contiguous range $00:80C9-$82D7, two RTI exits (normal, and a stack-swapping alt path when $012A != 0), callees 0089e0, 0083d1 (normal path) and 009337 (alt path). Callee unit files created. NMI is the setter of $12 (INC when zero), which answers the open question in 008000."
-uncertain = "0089e0 return width (jump table at $00:8C6E not decoded). Whether the alt path's $1F0A swap pairs with IRQ's use of $1F0A as a two-thread scheme (not traced here)."
-next_check = "Spec step: list the hw write order for both paths (APU ports, PPU mirrors, $4209/$420A/$4200 IRQ setup when $0128 != 0 or on the alt path, INIDISP/HDMAEN last). Note the $4210/$4211 reads (ack) and the 16-bit push/pull frame. Resolve the 0089e0 followup or carry it."
+done = "Mapped (earlier session) and specced NMI: full hw write order for both paths, APU port 0-3 queue logic with its echo-clear and stuck-request quirks, $12 lag-frame skip, V-IRQ arm differences, and the exact 13-byte frame swapped through $1F0A on the alt path."
+uncertain = "0089e0 return width still open (table at $00:8C6E undecoded); spec assumes m8x8. Who seeds $1F0A and sets $012A is unconfirmed (byte-search candidates in followups). Meaning of $0130 vs $0133 split at $F2 is a guess."
+next_check = "Translator: model APU port reads ($2140/$2141) and $4210/$4211 as hw reads with test-supplied values. Alt-path tests need a hand-built 13-byte frame at [$1F0A]+1. Mapping 0089e0 should confirm its exits return at m8x8 before verification."
