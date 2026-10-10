@@ -1,7 +1,7 @@
 id = "0082d8"
 name = "IRQ"
 address = "$00:82D8"
-status = "specced"
+status = "translated"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -20,6 +20,7 @@ ROM byte search for JMP/JSR/JSL/JML to $82D8/$82E9/$82F3/$8317/$831F in bank $00
 (two '22 17 83 00' inside bank $0B tables at $0B:F04D/$0B:F365, one '20 1F 83' at $14:A5FB which would target bank $14). Treated as coincidental.
 """
 followups = [
+  { address = "shared", reason = "0082d8 translation added shared, additive-only infrastructure in alttp-core (no existing behavior changed): cpu.rs (Cpu regs, flag consts, bank0_wram, push/pull, rep/sep, native rti), State.cpu, Hw::r8 + HwInputs::read_seq/set_reads (per-address read sequences, last value repeats, panics if none supplied) + Hw.reads log, wram::addr constants. Reviewer should sign off on these as the shared shape for NMI and later units." },
   { address = "$00:80C9", reason = "NMI spec: IRQ is the second half of the $1F0A thread switch. Both NMI ($00:822D) and IRQ ($00:831F) swap S with $1F0A when $012A != 0; the spec for either should describe the pair together." },
 ]
 
@@ -87,8 +88,8 @@ test_states = [
   "Entry with interrupted P at m8x8 and at m16x16, A/X/Y with nonzero high bytes, D!=0, DB!=0: identical behavior, everything restored by RTI.",
 ]
 [code]
-file = ""
-function = ""
+file = "alttp-recomp/crates/alttp-core/src/bank00/irq.rs"
+function = "alttp_core::bank00::irq::irq"
 
 [verify]
 fixtures = ""
@@ -98,6 +99,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Specced IRQ from a fresh local trace (matches the map): thread-swap path via $1F0A, ack-only path, and the HBlank BG3 scroll split from $0630/$0631 with the $0128 bit-7 one-shot that writes $4200=$81. Full hw order and the 13-byte frame swap described."
-uncertain = "Who sets $0630/$0631 and $0128 outside NMI/IRQ (unmapped). The thread setup ($1F0A seeding, $012A writers) is still unconfirmed, same followups as NMI."
-next_check = "Translator: model $4211 and $4212 as hw reads with test-supplied values (the $4212 poll is a loop, so the harness needs a read sequence). Thread-path tests need a hand-built 13-byte frame at [$1F0A]+1, same as NMI alt path tests; reuse that fixture helper."
+done = "Translated IRQ instruction by instruction (recomp 9e2ecbd). irq(&mut State) takes s.cpu as at $00:82D8 (hardware frame P/PC/PB already pushed, PB=0) and leaves s.cpu as RTI resumes it. Stack is modelled in WRAM via bank $00, so the 9-byte push frame and the PHK/PLB $00 byte at entry S-9 are real WRAM writes. All spec test_states covered by 8 unit tests in irq.rs; cargo test -p alttp-core passes. Spec and asm agree; no discrepancies."
+uncertain = "Shared infra was created here because none existed (see followups). HW read model: $4211/$4212 values come from HwInputs::read_seq; the last value repeats, so a harness ending a $4212 sequence without bit 6 hangs, as on hardware. Intermediate N/Z/V flag updates are modelled but dead (RTI restores P)."
+next_check = "Verifier: diff WRAM including the stack page (entry S-9..entry S are written; on the thread path they must match as the suspended frame) and the hw write log. Reference needs $4211/$4212 read values injected. Blocked on O-001 for the reference emulator."
