@@ -1,7 +1,7 @@
 id = "0083d1"
 name = "ReadJoypad"
 address = "$00:83D1"
-status = "specced"
+status = "translated"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -12,7 +12,9 @@ Width-sensitive: all loads/stores and TAY/STY assume M=1, X=1 (8-bit). NMI's 008
 Merge decision: not merged into 0080c9. 20 insns is not under the ~20 threshold, 0080c9 is already specced with 0083d1 as a stubbed callee, and pointer-table references are not ruled out. Same call as the 0080c9 map.
 Touches: STZ $4016 (JOYSER0), reads $4218/$4219 (JOY1L/JOY1H auto-read), writes dp $00/$01, $F0/$F2/$F4/$F6/$F8/$FA, reads old $F8/$FA.
 """
-followups = []
+followups = [
+  "HwInputs.joypad ([u16; 4]) is unused: 0083d1 reads $4218/$4219 through Hw::r8 / read_seq so reads are logged in order. Decide whether to drop the field or route r8 of $4218-$421F through it (shared hw.rs, not owned by this unit).",
+]
 
 [map]
 bounds = ["$00:83D1-$00:83F8"]
@@ -75,8 +77,8 @@ test_states = [
 ]
 
 [code]
-file = ""
-function = ""
+file = "crates/alttp-core/src/bank00/read_joypad.rs"
+function = "read_joypad"
 
 [verify]
 fixtures = ""
@@ -86,6 +88,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped (run-2026-10-10-c, earlier session). Specced (mapped -> specced, run-2026-10-10-c): inputs, outputs, HW order, quirks and test states filled from a local trace. D=$0000 / DB=$00 confirmed from 0080c9 spec (NMI sets both before the body)."
-uncertain = "Whether $00/$01 are meaningful to anyone after NMI; kept as outputs, not scratch. Entry width relies on 0089e0 returning at m8x8 (open followup on 0080c9)."
-next_check = "Translator: model $4218/$4219 as hw reads with test-supplied values and $4016 as a logged hw write. Return A, Y and N/Z; X, B, C, V pass through. Straight-line, ~20 lines of Rust."
+done = "Mapped and specced earlier (run-2026-10-10-c). Translated (specced -> translated, run-2026-10-10-c): read_joypad in bank00/read_joypad.rs, one statement group per instruction, spec and fresh trace agree. $4016 logged as hw write; $4218/$4219 read via Hw::r8 (logged, order checked). DP addresses go through D (D+off, bank 0 WRAM). Added wram::addr JOY1_* constants for $F0-$FA. 5 tests cover the spec test_states incl. 500 random cases checking A/B, Y, X, P (C/V/I/D carried), S/D/DB pass-through. cargo test -p alttp-core passes (21 tests), clippy clean."
+uncertain = "Whether $00/$01 are meaningful to anyone after NMI; kept as outputs. Entry width relies on 0089e0 returning at m8x8 (open followup on 0080c9). Decimal flag irrelevant (no ADC/SBC)."
+next_check = "Verifier: diff against the original with random $4218/$4219 and $F8/$FA; hw log should be exactly write $4016=0, read $4218, read $4219."
