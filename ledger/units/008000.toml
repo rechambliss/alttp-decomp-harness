@@ -1,18 +1,35 @@
 id = "008000"
 name = "Reset"
 address = "$00:8000"
-status = "unmapped"
-owner = "run-2026-10-10-a"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Emulation-mode RESET vector target, read from header at $00:FFFC."
-followups = []
+notes = """
+Emulation-mode RESET vector target, read from header at $00:FFFC.
+Entry width m8x8 is forced by hardware: the 65816 resets in emulation mode (E=1, M=1, X=1).
+Never returns. Init runs once, then an endless main loop at $00:8034.
+Mode switch at $00:801B-$801C: carry is cleared immediately before the exchange, so the CPU always lands in native mode (E=0). This resolves the tool's XCE WARN.
+It then clears M and the decimal flag, sets the direct page register to $0000 and the stack pointer to $01FF, and sets M and X back to 8-bit before the first call.
+Main loop: wait until $12 is nonzero, enable IRQs, then branch over $00:803B-$8050 to $00:8051. The skipped bytes are not reachable from Reset (see followups).
+Loop body, in order: increment $1A, call 00841e, long-call 0080b5, call 0085ec, clear $12, return to the wait.
+Callee return widths: 00841e, 0085ec and 008797 each exit through a single RTS at m8x8 (traced locally this session).
+0088d8 returns through RTS at m8x8 if its callee 00885f preserves M/X. 0080b5 ends in JML [$0003], so its return width depends on each dispatched module.
+The loop code after $00:805A (clearing $12, then reading $12 and incrementing $1A next pass) is width-sensitive, so every dispatched module must return with M=8 and X=8.
+Tool summary listed callee 0080b5 as a JSL target in bank 00; it returns to $00:805A via the module's RTL.
+No jump tables in this unit. Size 32 instructions. Not merged: it is a vector entry, not a single-caller helper.
+"""
+followups = [
+  { address = "$00:80B5", reason = "Dispatcher: uses $10 as an index to build a 24-bit pointer at $03-$05 from three parallel byte tables at $00:8061, $00:807D, $00:8099, then long-jumps through it. Tool --table does not decode split byte tables. Each target is its own unit. Confirm every target returns via RTL at m8x8; Reset's loop depends on it." },
+  { address = "$00:885F", reason = "Callee of 0088d8. Confirm it preserves M/X so 0088d8 returns to Reset at m8x8." },
+  { address = "$00:803B", reason = "Bytes $00:803B-$8050 are skipped by the branch at $00:8039 and unreachable from Reset. They read $F6 and $0FD7 and branch to $8051 or $805A. Check whether any other code reaches them before treating them as dead." },
+]
 
 [map]
-bounds = []
-mx_entry = ""
-callees = []
+bounds = ["$00:8000-$00:803A", "$00:8051-$00:8060"]
+mx_entry = "m8x8"
+callees = ["0080b5", "00841e", "0085ec", "008797", "0088d8"]
 jump_tables = []
-size_insns = 0
+size_insns = 32
 merged_into = ""
 
 [spec]
@@ -36,6 +53,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped Reset: bounds, entry width, mode switch, stack and DP setup, main loop shape, 5 callees with unit files created."
+uncertain = "Return widths of 0080b5 (indirect JML into modules) and 0088d8 (via 00885f) are not yet confirmed. Reset's loop assumes m8x8 after both. Whether $00:803B-$8050 is truly dead is unchecked."
+next_check = "Spec session for 008000. Resolve the 0080b5 and 00885f followups before 008000 is translated. Verifier: Reset never returns, so the harness needs a stop condition (e.g. first arrival at $00:8034, or N loop iterations)."

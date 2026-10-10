@@ -1,0 +1,41 @@
+id = "00841e"
+name = "sub_00841e"
+address = "$00:841E"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Called by Reset main loop ($00:8053, JSR) at m8x8. Single RTS exit at m8x8 per local trace."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

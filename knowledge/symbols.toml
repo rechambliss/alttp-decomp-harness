@@ -22,3 +22,17 @@ name = "IRQ"
 kind = "routine"
 confidence = "verified"
 source = "header vector"
+
+[[symbol]]
+address = "$00:8034"
+name = "Reset_MainLoop"
+kind = "label"
+confidence = "likely"
+source = "008000 map: endless loop that waits on $12, then runs one frame of work"
+
+[[symbol]]
+address = "$00:80B5"
+name = "MainModuleDispatch"
+kind = "routine"
+confidence = "guess"
+source = "008000 map: indexes byte tables by $10 and long-jumps through $03-$05; not yet mapped as its own unit"
