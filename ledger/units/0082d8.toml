@@ -1,7 +1,7 @@
 id = "0082d8"
 name = "IRQ"
 address = "$00:82D8"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -32,14 +32,60 @@ size_insns = 49
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
-hw_writes = []
-scratch = []
-quirks = []
-test_states = []
-
+summary = """
+H/V-IRQ handler. Saves A/X/Y (16-bit), D, DB; sets DB=$00 (D left as interrupted, unused); body at m8x8.
+Thread mode ($012A != 0): acks $4211 and swaps S with $1F0A, returning into the other stack (pairs with NMI's alt path; NMI arms this IRQ at line [$FF]).
+Otherwise acks $4211; if it was a real timer IRQ (bit 7) and $0128 != 0, waits for HBlank and loads BG3HOFS from $0630/$0631 and BG3VOFS = 0 (mid-screen BG3 split, NMI arms it at line $80).
+If $0128 bit 7 is set the split is one-shot: clears $0128 and writes $4200 = $81 (V-IRQ off). Restores registers and RTI.
+"""
+inputs = [
+  "CPU state of the interrupted code: A, X, Y (full 16 bits), D, DB, P, PB:PC (pushed or already on the stack, restored on exit)",
+  "S at entry (the native interrupt frame P, PCL, PCH, PB is already on the stack)",
+  "WRAM $7E:012A NMI_ALT_THREAD (u8): path select, read via DB=$00 (absolute $012A)",
+  "HW read $4211 TIMEUP: every path reads it once (ack). Value used only on the non-thread path (bit 7 = timer IRQ flag)",
+  "WRAM $7E:0128 IRQ_ENABLE_REQ (u8): non-thread path, only when $4211 bit 7 set; read twice (zero test, then bit 7 test after the split)",
+  "HW read $4212 HVBJOY bit 6 (HBlank), polled in a loop until set: split path only",
+  "WRAM $7E:0630/$0631 IRQ_BG3HOFS (u8 each): split path only",
+  "WRAM $7E:1F0A ALT_THREAD_SP (u16) and the other thread's 13-byte frame at [$1F0A]+1: thread path only",
+]
+outputs = [
+  "Non-thread paths: A, X, Y, D, DB, P, PB:PC and S restored exactly to the interrupted values (RTI).",
+  "Thread path: S = old [$1F0A] + 13; A, X, Y, D, DB, P, PB:PC are pulled from that other stack. [$1F0A] = entry S - 9 (S after the 9-byte push).",
+  "WRAM $7E:0128 = 0 when the split ran and $0128 bit 7 was set; unchanged otherwise",
+]
+hw_writes = [
+  "Order matters.",
+  "All paths: read $4211 first (ack). Thread path: no hw writes at all.",
+  "Split path ($012A == 0, $4211 bit 7 set, $0128 != 0): poll $4212 until bit 6 set, then",
+  "  $2111 BG3HOFS x2 = $0630, $0631; $2112 BG3VOFS x2 = $00, $00;",
+  "  then only if $0128 bit 7 set: $4200 NMITIMEN = $81 (after STZ $0128)",
+  "Ack-only path ($012A == 0 and ($4211 bit 7 clear or $0128 == 0)): no hw writes.",
+]
+scratch = [
+  "Stack bytes entry S-8..entry S (the 9-byte A/X/Y/D/DB push frame): dead after the non-thread RTI. On the thread path they stay live as the suspended thread's saved frame, so do not ignore them there.",
+]
+quirks = [
+  "SEI is redundant (native interrupt entry already sets I). Keep it; no observable effect.",
+  "Unlike NMI, D is pushed/pulled but never set to 0. The body uses only absolute addressing, so D has no effect; do not add a TCD.",
+  "SEP #$30 after the pushes zeroes the high bytes of X and Y. Harmless: the 16-bit pulls restore them. On the thread path TSC/TAX happen after REP #$30, so the full 16-bit S is saved.",
+  "Thread path does not test $4211 bit 7 and ignores $0128: any IRQ (or spurious IRQ) while $012A != 0 swaps stacks.",
+  "The $4211 read happens on every path, including the thread path (at $00:831F, before REP). It is the only ack; the split path's bit-7 test uses that same read.",
+  "If $4211 bit 7 is clear (not a timer IRQ) the split is skipped even when $0128 != 0, and $0128 is not cleared.",
+  "$0128 nonzero with bit 7 clear: the split runs and IRQs stay enabled (NMI re-arms V-IRQ every frame anyway). Bit 7 set: one-shot, STZ $0128 then $4200=$81 (NMI + auto-joypad, V-IRQ off).",
+  "$0128 is read twice: the bit-7 test reads it again after the $2112 writes, not the value tested before the HBlank wait.",
+  "HBlank wait is an unbounded spin on $4212 bit 6 (BIT/BVC). A harness must supply a $4212 value with bit 6 set (or a sequence ending in one) or it hangs.",
+  "BG3VOFS is always zeroed (two STZ), not loaded from a mirror. Only BG3HOFS comes from $0630/$0631.",
+  "The 13-byte frame layout (top to bottom: DB, D lo/hi, Y lo/hi, X lo/hi, A lo/hi, P, PCL, PCH, PB) must match NMI's alt path exactly; the swap code is identical to NMI's $00:822D sequence apart from NMI not reading $4211 there.",
+]
+test_states = [
+  "Thread path: $012A=1, $1F0A pointing at a prepared 13-byte frame in another stack area; $4211 readback both $80 and $00 (same result). Check $4211 read, no hw writes, new S, [$1F0A] = entry S - 9, registers/P/PC pulled from the frame.",
+  "Ack-only, not a timer IRQ: $012A=0, $4211 readback $00, $0128=$80. No writes, $0128 unchanged, exact register restore.",
+  "Ack-only, $0128=0: $012A=0, $4211 readback $80. No writes, $4212 never read.",
+  "Split, repeating: $012A=0, $4211=$80, $0128=$01, $0630/$0631=$34/$12, $4212 readback $40. Writes $2111=$34,$12; $2112=0,0; no $4200; $0128 stays $01.",
+  "Split, one-shot: as above with $0128=$80 (and $FF). Same writes then $4200=$81, $0128=0.",
+  "HBlank spin: $4212 sequence $00,$00,$40 (and $80 then $40: bit 7 alone must not exit). Split writes only after bit 6 seen.",
+  "Entry with interrupted P at m8x8 and at m16x16, A/X/Y with nonzero high bytes, D!=0, DB!=0: identical behavior, everything restored by RTI.",
+]
 [code]
 file = ""
 function = ""
@@ -52,6 +98,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped IRQ from a fresh local trace: one range $00:82D8-$8332, three RTI paths (ack-only, BG3 scroll split at HBlank driven by $0128/$0630, and the $012A stack swap with $1F0A). No callees or tables."
-uncertain = "What sets $0630/$0631 and the bit-7 meaning of $0128 (one-shot IRQ that turns itself off). Whether the ROM byte-search hits are all data (they look like it)."
-next_check = "Spec step: hw order matters ($4211 read first, $4212 poll, $2111 x2, $2112 x2, then $4200). D is not reset to 0, but the body uses only absolute addressing so D is irrelevant. The $4212 spin needs a test state where HBlank is already set or the harness models it."
+done = "Specced IRQ from a fresh local trace (matches the map): thread-swap path via $1F0A, ack-only path, and the HBlank BG3 scroll split from $0630/$0631 with the $0128 bit-7 one-shot that writes $4200=$81. Full hw order and the 13-byte frame swap described."
+uncertain = "Who sets $0630/$0631 and $0128 outside NMI/IRQ (unmapped). The thread setup ($1F0A seeding, $012A writers) is still unconfirmed, same followups as NMI."
+next_check = "Translator: model $4211 and $4212 as hw reads with test-supplied values (the $4212 poll is a loop, so the harness needs a read sequence). Thread-path tests need a hand-built 13-byte frame at [$1F0A]+1, same as NMI alt path tests; reuse that fixture helper."
