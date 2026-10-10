@@ -1,0 +1,41 @@
+id = "0080c9"
+name = "NMI"
+address = "$00:80C9"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Native-mode NMI vector target, read from header at $00:FFEA. Runs every vblank."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

@@ -1,0 +1,45 @@
+# Unit file template. Copy to ledger/units/<id>.toml
+# id = 6 lowercase hex digits: bank + address, e.g. "02a1b2" for $02:A1B2
+
+id = "000000"
+name = "sub_000000"          # rename once understood
+address = "$00:0000"
+status = "unmapped"          # unmapped|mapped|specced|translated|verified|reviewed|done|blocked
+owner = ""                   # session label while someone is working on it
+blocked_reason = ""
+notes = ""
+followups = []               # [{ address = "$00:0000", reason = "" }]  must stay above the first [table]
+
+[map]
+bounds = []                  # ["$00:0000-$00:003F", ...] address ranges in this unit
+mx_entry = ""                # "m8x8" | "m8x16" | "m16x8" | "m16x16" | "varies: see notes"
+callees = []                 # unit ids
+jump_tables = []             # [{ at = "$00:0000", entries = 0, targets = [] }]
+size_insns = 0
+merged_into = ""             # unit id if folded into a caller
+
+[spec]
+summary = ""                 # <= 5 lines, own words
+inputs = []                  # ["A (u8)", "WRAM $7E:0022 LINK_X (u16)", "C flag"]
+outputs = []
+hw_writes = []               # ["$2100 INIDISP", ...]
+scratch = []                 # WRAM addresses the verifier ignores
+quirks = []
+test_states = []             # what starting states exercise each branch
+
+[code]
+file = ""                    # path in alttp-recomp
+function = ""
+
+[verify]
+fixtures = ""                # path in alttp-recomp
+result = ""                  # "pass" | "fail: <first diff>"
+
+[review]
+result = ""
+
+[handoff]
+# <= 30 lines total across these fields
+done = ""
+uncertain = ""
+next_check = ""

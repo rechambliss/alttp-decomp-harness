@@ -1,0 +1,41 @@
+id = "008000"
+name = "Reset"
+address = "$00:8000"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Emulation-mode RESET vector target, read from header at $00:FFFC."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""
