@@ -1,18 +1,18 @@
 id = "00841e"
-name = "sub_00841e"
+name = "ClearOamBuffer"
 address = "$00:841E"
-status = "unmapped"
-owner = "run-2026-10-10-b"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Called by Reset main loop ($00:8053, JSR) at m8x8. Single RTS exit at m8x8 per local trace."
+notes = "Called by Reset main loop ($00:8053, JSR) at m8x8. Single RTS exit at m8x8. Straight-line leaf: PHD, then 4 passes (X = $60,$40,$20,$00; loop exits when X goes to $E0) that set D = $0800 then D = $0900 and store $F0 to 16 dp,X offsets each ($01,$05,..,$1D and $81,$85,..,$9D). Net effect: every 4th byte $0801..$08FD and $0901..$09FD = $F0, i.e. the Y byte of all 128 OAM entries in the low-table buffer. PLD, RTS. M/X stay m8x8 throughout. 51 insns, no callees, no tables: no split or merge."
 followups = []
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:841E-$00:8479"]
+mx_entry = "m8x8"
 callees = []
 jump_tables = []
-size_insns = 0
+size_insns = 51
 merged_into = ""
 
 [spec]
@@ -36,6 +36,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped $00:841E-$8479 (51 insns, m8x8 at entry and every label, single RTS). Leaf: no callees, no jump tables. Renamed ClearOamBuffer (likely): writes $F0 to OAM Y bytes for all 128 sprites in the $0800-$09FF buffer."
+uncertain = "Exit state for the spec step: X = $E0, A low = $E0, B (A high) = $09, N=1 Z=0 C=0 (SBC borrow from $00-$20), D restored from stack. Whether the caller relies on any of that is unchecked. Native-mode dp,X addressing does not page-wrap here (max offset $9D+$60 = $FD)."
+next_check = "Cartographer: spec step (mapped -> specced). Only memory writes are the 128 bytes $7E:0801+4n (n=0..127) via the bank-0 WRAM mirror; no hw regs touched."

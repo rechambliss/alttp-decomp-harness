@@ -113,3 +113,10 @@ name = "MainModuleTable_Bank"
 kind = "data"
 confidence = "likely"
 source = "0080b5 map: 28 bank bytes of module entry addresses, indexed by $10"
+
+[[symbol]]
+address = "$00:841E"
+name = "ClearOamBuffer"
+kind = "routine"
+confidence = "likely"
+source = "00841e map: sets Y byte of all 128 OAM buffer entries ($0801+4n) to $F0 (offscreen); called once per frame by Reset main loop"

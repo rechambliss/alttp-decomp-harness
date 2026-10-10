@@ -27,6 +27,7 @@ $7E:0130  2  APU_LAST_0_1  guess  $0130: last $012C value below $F2; $0131: last
 $7E:0133  1  APU_LAST_PORT0  guess  Last value sent to $2140; compared against $012C and against readback of $2140  (0080c9)
 $7E:0630  2  IRQ_BG3HOFS  guess  IRQ writes $0630/$0631 to $2111 (BG3HOFS low, high) at HBlank for a mid-screen BG3 split, and zeroes BG3VOFS  (0082d8)
 $7E:0638  4  M7_CENTER_MIRROR  likely  $0638/39 -> $211F M7X, $063A/3B -> $2120 M7Y, written only when BG mode is 7  (0080c9)
+$7E:0800  512  OAM_BUFFER_LOW  likely  Shadow of OAM low table, 128 entries x 4 bytes (X, Y, tile, attr); 00841e sets every Y byte ($0801+4n) to $F0 each frame to hide unused sprites  (00841e)
 $7E:0FD7  1  DEBUG_PAUSE_TOGGLE  guess  Incremented by dead code at $00:803B on $F6 bit 5; bit 0 set skipped the frame body. This reader is unreachable in EU; other users not checked  (00803b)
 $7E:1F0A  2  ALT_THREAD_SP  likely  Saved stack pointer swapped with S on the NMI alt path and on the IRQ path at $00:831F (both when $012A != 0). Points 1 below a 13-byte frame (DB, D, Y, X, A, P, PC, PB). Only other writer found by byte search: $09:F7FB (unconfirmed)  (0080c9, 0082d8)
 $7E:1F0C  1  UPLOAD_E800_REQ  guess  When nonzero 009337 DMAs $7E:E800 to VRAM and clears it  (0080c9, seen in callee 009337)
