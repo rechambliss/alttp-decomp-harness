@@ -31,6 +31,13 @@ confidence = "likely"
 source = "008000 map: endless loop that waits on $12, then runs one frame of work"
 
 [[symbol]]
+address = "$00:803B"
+name = "Reset_DebugPauseCheck"
+kind = "label"
+confidence = "guess"
+source = "00803b map: dead code skipped by BRA at $00:8039; $F6 bit 5 toggles $0FD7, bit 4 steps a frame"
+
+[[symbol]]
 address = "$00:8051"
 name = "Reset_FrameBody"
 kind = "label"

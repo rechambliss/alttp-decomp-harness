@@ -1,22 +1,33 @@
 id = "00803b"
-name = "sub_00803b"
+name = "Reset_DebugPauseCheck"
 address = "$00:803B"
-status = "unmapped"
-owner = "run-2026-10-10-b"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Followup from 008000. Bytes $00:803B-$8050 are skipped by the branch at $00:8039 and unreachable from Reset. They read $F6 and $0FD7 and branch to $8051 or $805A. Check whether any other code reaches them before treating them as dead."
+notes = """
+Dead code inside Reset's main loop: the unconditional BRA at $00:8039 always jumps over it, and nothing else reaches it.
+Reachability check (EU ROM, whole 1 MiB scanned): no JSR/JMP $803B, no JSL/JML $00:803B or $80:803B, no branch into $803B-$8050
+from aligned code, no vector at $00:FFE0-$FFFF, none of the 28 entries of 0080b5's split dispatch table ($00:8061/$807D/$8099) is $00:803B.
+The only raw "3B 80" byte pairs are at $0C:E13D and $14:8991, inside data with no jump opcode in front; not code pointers.
+Entry width would be m8x8 (the width at $00:8039, per 008000). 10 instructions, no calls, no tables.
+Shape (no translation needed): if $F6 bit 5 set, increment $0FD7. If $F6 bit 4 set, go to $00:8051 (full frame).
+Else if $0FD7 bit 0 set, go to $00:805A (skip $1A++, 00841e and the module dispatch; still run 0085ec and clear $12). Else fall into $00:8051.
+Looks like a disabled debug pause / frame-advance: bit 5 toggles pause, bit 4 steps one frame while paused. Interpretation is a guess.
+Exits are fall-through/branches to $00:8051 and $00:805A, both labels inside unit 008000, not separate units. Tool listed them as callees; dropped to keep the ledger consistent.
+Merged into 008000 so no role picks it up. 008000's spec already says not to translate these bytes; nothing further to do unless a later pass wants a debug-pause feature flag.
+"""
 followups = []
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:803B-$00:8050"]
+mx_entry = "m8x8"
 callees = []
 jump_tables = []
-size_insns = 0
-merged_into = ""
+size_insns = 10
+merged_into = "008000"
 
 [spec]
-summary = ""
+summary = "Unreachable (skipped by BRA at $00:8039). Disabled debug pause/frame-advance check on $F6 bits 5/4 and $0FD7 bit 0. Not translated; see notes."
 inputs = []
 outputs = []
 hw_writes = []
@@ -36,6 +47,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped $00:803B-$8050 (10 insns, m8x8). Proved unreachable in EU ROM: no direct jumps, branches, vectors or 0080b5 table entries target it. Merged into 008000 as dead code."
+uncertain = "Meaning of $F6 (likely joypad new-press byte) and $0FD7 (pause toggle) is a guess. Indirect jumps through RAM pointers other than 0080b5 were not checked exhaustively."
+next_check = "Orchestrator: close 008000's followup on $00:803B (answered: dead). Revisit only if a computed jump to $00:803B turns up."
