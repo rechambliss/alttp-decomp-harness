@@ -38,8 +38,17 @@ def addr_to_id(addr):
     return (m.group(1) + m.group(2)).lower() if m else None
 
 
+def deps(u):
+    """Everything a unit transfers control to: callees plus jump-table targets."""
+    m = u.get("map", {})
+    out = list(m.get("callees", []))
+    for jt in m.get("jump_tables", []):
+        out.extend(jt.get("targets", []))
+    return out
+
+
 def callees_ready(u, units):
-    for c in u.get("map", {}).get("callees", []):
+    for c in deps(u):
         if c not in units:
             return False
         if units[c][1]["status"] not in TRANSLATED_OR_LATER:
@@ -135,9 +144,9 @@ def cmd_validate(units):
         if not isinstance(u.get("followups", []), list):
             errors.append(f"{i}: followups must be a top-level list (put it above the first [table])")
         m = u.get("map", {})
-        for c in m.get("callees", []):
+        for c in deps(u):
             if c not in units:
-                errors.append(f"{i}: callee {c} has no unit file")
+                errors.append(f"{i}: callee or jump-table target {c} has no unit file")
         mi = m.get("merged_into", "")
         if mi and mi not in units:
             errors.append(f"{i}: merged_into {mi} has no unit file")
