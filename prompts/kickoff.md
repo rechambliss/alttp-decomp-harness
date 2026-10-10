@@ -24,5 +24,5 @@ Steps:
    If still none, report "no work for {{ROLE}}" and stop.
 3. Do the unit per your role file. One unit only.
 4. Run the finish checklist in `CLAUDE.md`.
-5. Commit in both repos with the unit id in the message.
+5. Commit in `alttp-decomp-harness` with the unit id in the message. Commit in `alttp-recomp` only if you changed files there. Never make an empty commit. Push what you committed.
 6. End with a 3-line summary: the unit, its new status and anything blocked.

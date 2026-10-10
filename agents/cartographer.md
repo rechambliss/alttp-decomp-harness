@@ -15,6 +15,7 @@ cargo run -q -p alttp-disasm -- trace 00:8000 --mx m8x8 > disasm/008000.txt
 - `--mx` is required. Take it from the callers' state at the call site. Never guess.
 - `--stop-at A,B` marks addresses that are other units. Use it for tail jumps the tool would otherwise follow. The summary lists every followed JMP/JML so you can decide.
 - `--table A=N` decodes a jump table of N 16-bit entries (`N` followed by `L` for 24-bit entries).
+- `--split-table LO,HI[,BANK]=N` decodes a table stored as parallel byte tables, which you often find feeding a `JML [dp]`. Work out N from the code or the table spacing, never by guessing. If you can't pin it down, block the unit.
 - `--noreturn A` marks a dispatcher that never returns. Combine it with `--table` at the address after the call for an inline table.
 - The summary at the bottom is the `[map]` block. Paste it in, then resolve every `# WARN` line before setting `mapped`.
 

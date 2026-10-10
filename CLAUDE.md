@@ -39,4 +39,4 @@ Any state can go to `blocked`. Verification failure sends a unit back to `transl
 - [ ] New symbols added to `knowledge/symbols.toml`.
 - [ ] New RAM facts added to `knowledge/ram-map.md`.
 - [ ] `python3 scripts/ledger.py validate` passes.
-- [ ] Commits in both repos reference the unit id.
+- [ ] The harness commit references the unit id. Commit in recomp only if you changed code there, and never make an empty commit.
