@@ -1,7 +1,7 @@
 id = "0083d1"
 name = "ReadJoypad"
 address = "$00:83D1"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -23,13 +23,56 @@ size_insns = 20
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
-hw_writes = []
+summary = """
+Reads controller 1 from the auto-joypad registers once per non-lag NMI. Writes 0 to $4016 first, then reads JOY1L ($4218) and JOY1H ($4219).
+Stores raw bytes to dp $00/$01 and to the held bytes $F2 (low: A X L R) and $F0 (high: B Y Sel Start U D L R).
+New-press bytes are (raw XOR prev) AND raw: $F6 from $4218 vs old $FA, $F4 from $4219 vs old $F8. Then prev bytes $FA/$F8 get the raw values.
+Runs with D=$0000, DB=$00 (set by NMI 0080c9). m8x8 in and out, straight line, single RTS.
+"""
+inputs = [
+  "M=1, X=1 (8-bit) at entry; D=$0000, DB=$00 (NMI sets both)",
+  "HW read $4218 JOY1L (u8), read first",
+  "HW read $4219 JOY1H (u8), read second",
+  "WRAM $7E:00FA JOY1_PREV_AXLR (u8), old value",
+  "WRAM $7E:00F8 JOY1_PREV_BYSTUDLR (u8), old value",
+  "X register: not read, passes through unchanged",
+  "C, V flags: not touched, pass through",
+]
+outputs = [
+  "WRAM $7E:0000 = raw $4218 (u8)",
+  "WRAM $7E:0001 = raw $4219 (u8)",
+  "WRAM $7E:00F2 JOY1_HELD_AXLR = raw $4218",
+  "WRAM $7E:00F6 JOY1_NEW_AXLR = ($4218 XOR old $FA) AND $4218",
+  "WRAM $7E:00FA JOY1_PREV_AXLR = raw $4218",
+  "WRAM $7E:00F0 JOY1_HELD_BYSTUDLR = raw $4219",
+  "WRAM $7E:00F4 JOY1_NEW_BYSTUDLR = ($4219 XOR old $F8) AND $4219",
+  "WRAM $7E:00F8 JOY1_PREV_BYSTUDLR = raw $4219",
+  "A (u8) = value stored to $F4; B (high byte of A) unchanged",
+  "Y (u8) = raw $4219 (YH stays 0 since X=1)",
+  "X unchanged",
+  "N, Z = from the final AND (i.e. of the $F4 value); C, V, D, I flags unchanged",
+  "M=1, X=1 at exit",
+]
+hw_writes = [
+  "$4016 JOYSER0 <- $00 (STZ), before both reads",
+  "Order: write $4016, read $4218, read $4219",
+]
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "STZ $4016 clears the manual-read latch even though the routine uses auto-joypad results; reproduce the write, do not drop it.",
+  "No wait on $4212 auto-read busy bit: the values read are whatever $4218/$4219 hold at that moment. Faithful translation reads them unconditionally.",
+  "Only controller 1 is read; $421A-$421F are untouched.",
+  "Old prev values ($FA, $F8) are read before being overwritten; the low byte pair is fully processed before $4219's value is used, but both HW reads happen up front.",
+  "$00/$01 are left holding the raw pad bytes. Treated as outputs (not scratch) until later readers are ruled out; see 0080c9 which does LDA $012A next without touching them.",
+]
+test_states = [
+  "No branches, so any state exercises the whole routine. Vary inputs to check the bit math:",
+  "Nothing pressed: $4218=$4219=0, prev=0 -> all outputs 0, A=0, Z=1.",
+  "New press: $4219=$80 (B), old $F8=$00 -> $F4=$80, A=$80, N=1; $4218=$C0 (A,X) with old $FA=$40 -> $F6=$80.",
+  "Held, not new: raw == prev (e.g. $4219=$FF, $F8=$FF) -> $F4=0, Z=1.",
+  "Release: raw=$00, prev=$FF -> new byte 0 (XOR gives $FF, AND raw gives 0).",
+  "Random: random $4218/$4219/$F8/$FA plus random X, B (A high byte) and C/V flags to confirm pass-through.",
+]
 
 [code]
 file = ""
@@ -43,6 +86,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped (unmapped -> mapped, run-2026-10-10-c). Bounds $00:83D1-$00:83F8, 20 insns, m8x8 throughout, single RTS, no callees, no tables. One caller ($00:8141 in NMI). Kept as its own unit (see notes). Added RAM entries for $F0/$F2/$F4/$F8/$FA and renamed $F6 (its source is $4218 = JOY1L, so the old JOY1_NEW_HI name was wrong)."
-uncertain = "Direct-page addressing: stores go to D+$00 etc. NMI is assumed to run with D=$0000 here; the spec step should confirm D at the call site in 0080c9. Whether $00/$01 are scratch depends on later readers; they look like plain temporaries."
-next_check = "Spec: new-press formula is (new XOR old) AND new per byte; old held values come from $F8/$FA before they are overwritten. Exit A = $F4 value, Y = raw $4219, X untouched. STZ $4016 happens before the reads."
+done = "Mapped (run-2026-10-10-c, earlier session). Specced (mapped -> specced, run-2026-10-10-c): inputs, outputs, HW order, quirks and test states filled from a local trace. D=$0000 / DB=$00 confirmed from 0080c9 spec (NMI sets both before the body)."
+uncertain = "Whether $00/$01 are meaningful to anyone after NMI; kept as outputs, not scratch. Entry width relies on 0089e0 returning at m8x8 (open followup on 0080c9)."
+next_check = "Translator: model $4218/$4219 as hw reads with test-supplied values and $4016 as a logged hw write. Return A, Y and N/Z; X, B, C, V pass through. Straight-line, ~20 lines of Rust."
