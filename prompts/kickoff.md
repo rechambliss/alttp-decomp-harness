@@ -15,6 +15,10 @@ Setup (skip anything already present):
   `rechambliss/alttp-decomp-harness`, `rechambliss/alttp-recomp`, `rechambliss/alttp-rom`.
 - `export ALTTP_ROM=<parent>/alttp-rom/alttp-eu.sfc`
 - Never copy the ROM or its bytes into the other two repos.
+- Sync both repos so you start from all previous sessions' work:
+  `bash alttp-decomp-harness/scripts/sync.sh alttp-decomp-harness && bash alttp-decomp-harness/scripts/sync.sh alttp-recomp`
+  If either one reports CONFLICT, stop and report it. Do no other work.
+- Work on `main` in both repos.
 
 Steps:
 1. `cd alttp-decomp-harness` and read `CLAUDE.md`, then `agents/{{ROLE}}.md`. Read nothing else up front.
@@ -25,5 +29,5 @@ Steps:
    If the unit is `mapped` rather than `unmapped`, your job is the spec step, not the map step.
 3. Do the unit per your role file. One unit only.
 4. Run the finish checklist in `CLAUDE.md`.
-5. Commit in `alttp-decomp-harness` with the unit id in the message. Commit in `alttp-recomp` only if you changed files there. Never make an empty commit. Push what you committed.
+5. Commit in `alttp-decomp-harness` with the unit id in the message. Commit in `alttp-recomp` only if you changed files there. Never make an empty commit. Push to main with `git push origin HEAD:main`. If that's rejected, push your branch instead and put its name in the summary.
 6. End with a 3-line summary: the unit, its new status and anything blocked.
