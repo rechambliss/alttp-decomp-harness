@@ -10,6 +10,12 @@ Session label: `{{LABEL}}` (e.g. `run-2026-10-11-a`)
 Role: `{{ROLE}}` (orchestrator | cartographer | translator | verifier | reviewer)
 Unit limit: `{{N}}` (orchestrator: max units to plan per role; other roles: always 1)
 
+Setup (skip anything already present):
+- Attach and clone these three private repos side by side in one parent folder, one at a time:
+  `rechambliss/alttp-decomp-harness`, `rechambliss/alttp-recomp`, `rechambliss/alttp-rom`.
+- `export ALTTP_ROM=<parent>/alttp-rom/alttp-eu.sfc`
+- Never copy the ROM or its bytes into the other two repos.
+
 Steps:
 1. `cd alttp-decomp-harness` and read `CLAUDE.md`, then `agents/{{ROLE}}.md`. Read nothing else up front.
 2. Orchestrator: follow your role file, then stop.

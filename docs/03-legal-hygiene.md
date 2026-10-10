@@ -27,6 +27,11 @@ Theme packs then override entries in that cache by id.
 |---|---|---|
 | EU (PAL) | `7c073a222569b9b8e8ca5fcb5dfec3b5e31da895` | 1 MiB, LoROM, no copier header, checksum `$75B9` valid |
 
+## Where the ROM lives
+
+It lives in the private repo `rechambliss/alttp-rom`, which is never made public and never forked.
+Sessions clone it next to the other two repos and point `ALTTP_ROM` at it.
+
 ## Agents
 
 If a task would require committing any of the above, stop and set the unit to `blocked`.
