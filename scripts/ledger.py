@@ -65,20 +65,49 @@ def cmd_status(units):
             print(f"  {i} {u['name']}: {u['blocked_reason']}")
 
 
+def eligible(units, role, owner=""):
+    """Units this role can work on now, owned by `owner` ("" = unowned).
+    Order: furthest-along status first (finish what's started), then by id."""
+    picks = []
+    for i, (_, u) in units.items():
+        if u["status"] not in ROLE_STATUSES[role] or u["owner"] != owner:
+            continue
+        if u.get("map", {}).get("merged_into"):
+            continue
+        if role == "translator" and not callees_ready(u, units):
+            continue
+        picks.append((i, u))
+    picks.sort(key=lambda x: (-RANK.get(x[1]["status"], 0), x[0]))
+    return picks
+
+
+OWNER_RE = re.compile(r'^owner = ".*"$', re.M)
+
+
+def cmd_claim(units, role, label, dry_run):
+    """Pick exactly one unit for this session: one already owned by the label first,
+    otherwise the next unowned one. Sets owner to the label. Exit 3 if there is no work."""
+    picks = eligible(units, role, label) or eligible(units, role, "")
+    if not picks:
+        print(f"none: no work for {role}")
+        return 3
+    i, u = picks[0]
+    path = units[i][0]
+    if not dry_run and u["owner"] != label:
+        text = path.read_text()
+        new, n = OWNER_RE.subn(f'owner = "{label}"', text, count=1)
+        if n != 1:
+            print(f"error: no owner line in {path.name}")
+            return 1
+        path.write_text(new)
+    print(f"{i} {u['name']} [{u['status']}] owner={label}{' (dry run)' if dry_run else ''}")
+    return 0
+
+
 def cmd_next(units, role, limit):
     roles = [role] if role else list(ROLE_STATUSES)
     for r in roles:
-        picks = []
-        for i, (_, u) in units.items():
-            if u["status"] not in ROLE_STATUSES[r] or u["owner"]:
-                continue
-            if u.get("map", {}).get("merged_into"):
-                continue
-            if r == "translator" and not callees_ready(u, units):
-                continue
-            picks.append((i, u))
-        # cartographer: mapped before unmapped (finish what's started)
-        picks.sort(key=lambda x: (-RANK.get(x[1]["status"], 0), x[0]))
+        picks = eligible(units, r)
         print(f"{r}:")
         if not picks:
             print("  (none)")
@@ -133,12 +162,18 @@ def main():
     n.add_argument("--role", choices=list(ROLE_STATUSES))
     n.add_argument("--limit", type=int, default=5)
     sub.add_parser("validate")
+    c = sub.add_parser("claim", help="pick and own one unit for this session")
+    c.add_argument("--role", choices=list(ROLE_STATUSES), required=True)
+    c.add_argument("--label", required=True)
+    c.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     units = load()
     if a.cmd == "status":
         cmd_status(units)
     elif a.cmd == "next":
         cmd_next(units, a.role, a.limit)
+    elif a.cmd == "claim":
+        sys.exit(cmd_claim(units, a.role, a.label, a.dry_run))
     else:
         sys.exit(cmd_validate(units))
 

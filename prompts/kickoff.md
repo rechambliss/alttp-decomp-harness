@@ -19,9 +19,10 @@ Setup (skip anything already present):
 Steps:
 1. `cd alttp-decomp-harness` and read `CLAUDE.md`, then `agents/{{ROLE}}.md`. Read nothing else up front.
 2. Orchestrator: follow your role file, then stop.
-   Other roles: open `ledger/RUN.md`, take the first unit listed for your role whose `owner` is `{{LABEL}}` or empty, and set `owner` to `{{LABEL}}`.
-   If none, run `python3 scripts/ledger.py next --role {{ROLE}}` and take the first one.
-   If still none, report "no work for {{ROLE}}" and stop.
+   Other roles: run `python3 scripts/ledger.py claim --role {{ROLE}} --label {{LABEL}}`.
+   It prints the one unit to work on and sets its owner. Work on that unit and no other.
+   If it prints `none`, report "no work for {{ROLE}}" and stop.
+   If the unit is `mapped` rather than `unmapped`, your job is the spec step, not the map step.
 3. Do the unit per your role file. One unit only.
 4. Run the finish checklist in `CLAUDE.md`.
 5. Commit in `alttp-decomp-harness` with the unit id in the message. Commit in `alttp-recomp` only if you changed files there. Never make an empty commit. Push what you committed.
