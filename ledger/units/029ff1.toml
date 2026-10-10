@@ -1,0 +1,41 @@
+id = "029ff1"
+name = "sub_029ff1"
+address = "$02:9FF1"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Jump table target of 0080b5 (main module dispatch) for MODULE_INDEX $10 = $19. Entered by JML [$0003] at m8x8 with DB=$00, D=$0000, Y = $10, A = bank byte 02; Reset's JSL return address is on the stack. Must exit via RTL at m8x8: Reset's loop at $00:805A relies on it (008000 followup). Entry width taken from the dispatcher, which is m8x8 and only called from Reset."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

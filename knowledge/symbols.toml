@@ -48,8 +48,8 @@ source = "008000 spec: one pass of per-frame work (INC $1A, 00841e, 0080b5, 0085
 address = "$00:80B5"
 name = "MainModuleDispatch"
 kind = "routine"
-confidence = "guess"
-source = "008000 map: indexes byte tables by $10 and long-jumps through $03-$05; not yet mapped as its own unit"
+confidence = "likely"
+source = "0080b5 map: Y=$10, builds $03-$05 from split byte tables at $00:8061/$807D/$8099 (28 entries), JML [$0003]"
 
 [[symbol]]
 address = "$00:822D"
@@ -92,3 +92,24 @@ name = "IRQ_ThreadSwitch"
 kind = "label"
 confidence = "likely"
 source = "0082d8 map: IRQ path taken when $012A != 0; acks $4211, swaps S with $1F0A before RTI"
+
+[[symbol]]
+address = "$00:8061"
+name = "MainModuleTable_Lo"
+kind = "data"
+confidence = "likely"
+source = "0080b5 map: 28 low bytes of module entry addresses, indexed by $10"
+
+[[symbol]]
+address = "$00:807D"
+name = "MainModuleTable_Hi"
+kind = "data"
+confidence = "likely"
+source = "0080b5 map: 28 high bytes of module entry addresses, indexed by $10"
+
+[[symbol]]
+address = "$00:8099"
+name = "MainModuleTable_Bank"
+kind = "data"
+confidence = "likely"
+source = "0080b5 map: 28 bank bytes of module entry addresses, indexed by $10"

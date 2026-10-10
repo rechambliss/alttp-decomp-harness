@@ -4,8 +4,8 @@ One line per address or range. Grep for the address, don't read the whole file.
 Format: `$7E:XXXX  size  NAME  confidence  meaning  (unit that established it)`
 
 <!-- entries below, sorted by address -->
-$7E:0003  3  DISPATCH_PTR  likely  24-bit target built from three byte tables, then jumped through by 0080b5  (008000, seen in callee 0080b5)
-$7E:0010  1  MODULE_INDEX  likely  Y index into the dispatch tables at $00:8061/$807D/$8099  (008000)
+$7E:0003  3  DISPATCH_PTR  likely  24-bit target (lo/hi/bank) built from three byte tables, then jumped through by 0080b5 (JML [$0003]); left holding the current module's entry address  (008000, 0080b5)
+$7E:0010  1  MODULE_INDEX  likely  Y index into the dispatch tables at $00:8061/$807D/$8099; 28 entries, valid $00-$1B, no bounds check  (008000, 0080b5)
 $7E:0012  1  FRAME_READY  likely  Main loop spins while zero, clears it after each pass (after 0085ec, so a set during frame work is lost: lag frame). Set by NMI: INC when zero, and only then NMI runs 0089e0 and 0083d1  (008000, 0080c9)
 $7E:0013  1  INIDISP_MIRROR  likely  Written to $2100 at the end of both NMI paths  (0080c9)
 $7E:0017  1  NMI_UPDATE_INDEX  guess  0089e0 jumps through $00:8C6E with X = $17*2, then clears it  (0080c9, seen in callee 0089e0)

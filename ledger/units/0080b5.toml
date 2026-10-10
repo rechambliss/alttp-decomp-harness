@@ -1,18 +1,31 @@
 id = "0080b5"
-name = "sub_0080b5"
+name = "MainModuleDispatch"
 address = "$00:80B5"
-status = "unmapped"
-owner = "run-2026-10-10-b"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Called by Reset ($00:8056, JSL). Dispatcher on $10 via three byte tables at $00:8061/$807D/$8099 and a long jump through $03-$05. 8 instructions; targets not yet decoded."
-followups = []
+notes = """
+Only caller: Reset at $00:8056 (JSL). Whole-ROM byte scan found no other JSL/JML/JSR/JMP to $80B5. Entry m8x8 from Reset's loop; no REP/SEP inside.
+8 instructions, straight line: Y = $10; $03 = $8061[Y], $04 = $807D[Y], $05 = $8099[Y] (lo, hi, bank); JML [$0003]. No RTS/RTL of its own.
+The three tables are 28 bytes each and contiguous: $8061+28=$807D, $807D+28=$8099, $8099+28=$80B5 (the entry). So N=28 comes from the spacing, not a guess.
+The tool's WARN on JML [$0003] is resolved by decoding the split table (--split-table $00:8061,$00:807D,$00:8099=28).
+Duplicate targets: modules $08 and $0A both go to 0283b9, modules $09 and $0B both go to 02a482. 26 distinct targets, each with a new unit file.
+Table reads are LDA abs,Y, so they use DB. DB=$00 from Reset (never set there), which is what puts the tables in bank 00.
+Y is 8-bit, so $10 >= 28 reads past the tables (into the next table or the code at $80B5). No bounds check. Unknown whether the game ever does that.
+Exit: the JML is a tail jump into the module. The module's RTL returns to Reset at $00:805A using Reset's JSL frame, so every module must end at m8x8 (see 008000 followup).
+Not merged into Reset despite <20 insns and one caller: methodology says a jump table dispatcher is its own unit.
+Trace command: cargo run -q -p alttp-disasm -- trace 00:80B5 --mx m8x8 --split-table '$00:8061,$00:807D,$00:8099=28'
+"""
+followups = [
+  { address = "$00:8056", reason = "008000's followup on $00:80B5 is answered by this map (table decoded, 28 entries). Whether each module returns via RTL at m8x8 is still open and moves to the 26 target units." },
+]
 
 [map]
-bounds = []
-mx_entry = ""
+bounds = ["$00:80B5-$00:80C8"]
+mx_entry = "m8x8"
 callees = []
-jump_tables = []
-size_insns = 0
+jump_tables = [{ at = "$00:8061", entries = 28, targets = ["0cc120", "0cccdf", "0cd072", "0cd4a4", "0cd8a9", "028130", "028218", "02879c", "0283b9", "02a482", "0283b9", "02a482", "029920", "02993d", "00f800", "029987", "029adc", "029afe", "09f2a0", "029c4f", "0cedcc", "029d01", "029e8f", "09f7af", "029ee1", "029ff1", "0e986e", "028580"] }]
+size_insns = 8
 merged_into = ""
 
 [spec]
@@ -36,6 +49,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped: 8 insns at $00:80B5-$80C8, m8x8, single caller Reset. Decoded the split byte table (lo $8061, hi $807D, bank $8099, 28 entries, size proven by spacing). Created 26 unit files for the distinct targets."
+uncertain = "Whether $10 ever exceeds $1B (out-of-table read). Return width of each module is not checked yet; that belongs to the target units."
+next_check = "Spec step (next cartographer): inputs $10 and DB, outputs $03-$05 and Y/A at the jump; translator can model it as a 28-entry fn table plus a faithful out-of-range read."
