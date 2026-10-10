@@ -1,18 +1,40 @@
 id = "0080c9"
 name = "NMI"
 address = "$00:80C9"
-status = "unmapped"
-owner = "run-2026-10-10-a"
+status = "mapped"
+owner = ""
 blocked_reason = ""
-notes = "Native-mode NMI vector target, read from header at $00:FFEA. Runs every vblank."
-followups = []
+notes = """
+Native-mode NMI vector target, read from header at $00:FFEA. Runs every vblank.
+Entry width: whatever the interrupted code had (native NMI pushes P but does not change M/X), so it varies.
+It does not matter: the first two instructions (SEI, REP #$30) are width-independent. Traces at m8x8 and m16x16 are byte-identical apart from the header line.
+REP #$30 then pushes A, X, Y (16-bit), D, DB; sets D=$0000 and DB=$00 (PHK/PLB); SEP #$30. Body runs at m8x8.
+Both exits restore the interrupted P via RTI after REP #$30 + PLB/PLD/PLY/PLX/PLA, so the pulls are always 16-bit for A/X/Y.
+Exit 1: RTI at $00:822C (normal path, $012A == 0).
+Exit 2: RTI at $00:82D7 (alternate path at $00:822D, taken by JMP when $012A != 0). This path swaps S with the word at $1F0A
+(TSC/TAX, LDA $1F0A/TCS, STX $1F0A) before the pulls, so it returns into a different stack/thread than it was entered from.
+$00:822D-$82D7 is part of this unit: a ROM byte search finds its only reference at the JMP operand $00:814A. Not a separate unit.
+WARN resolution (callees assumed to preserve M/X; all three are called at m8x8):
+- 0083d1: traced locally, straight-line, single RTS at m8x8. 20 insns.
+- 009337: traced locally, single RTS at m8x8 (REP #$20/SEP #$20 balanced). 20 insns.
+- 0089e0: entered at m8x8, ends in JMP ($8C6E,X) at m8x8 with an undecoded table, so its return width is open (followup). NMI calls 0083d1 right after it with no SEP, and 0083d1 is width-sensitive.
+Merge decision: 0083d1 and 009337 each have exactly one direct caller in the ROM byte search (JSR at $00:8141 and $00:822D, no JSL hits),
+but each is 20 insns (not under 20) and the search cannot rule out pointer-table references. Kept as separate leaf units.
+Size 213 insns, under the 300 split threshold. No jump tables in this unit.
+"""
+followups = [
+  { address = "$00:89E0", reason = "Callee of NMI at m8x8. Exits via JMP ($8C6E,X) with X = $17*2; table size unknown (tool WARN). Map the table and confirm every target returns via RTS at m8x8: NMI calls 0083d1 next with no SEP." },
+  { address = "$00:83D1", reason = "Merge candidate into 0080c9: 20 insns, one direct caller ($00:8141). Kept separate because it is not under 20 and indirect references were not ruled out." },
+  { address = "$00:9337", reason = "Merge candidate into 0080c9: 20 insns, one direct caller ($00:822D). Kept separate for the same reason as 0083d1." },
+  { address = "$00:82D8", reason = "IRQ also touches $1F0A (at $00:8327/$832B). The NMI alt path swaps S with $1F0A; the spec step should read IRQ's use to describe the thread switch correctly." },
+]
 
 [map]
-bounds = []
-mx_entry = ""
-callees = []
+bounds = ["$00:80C9-$00:82D7"]
+mx_entry = "varies: see notes"
+callees = ["0089e0", "0083d1", "009337"]
 jump_tables = []
-size_insns = 0
+size_insns = 213
 merged_into = ""
 
 [spec]
@@ -36,6 +58,6 @@ result = ""
 result = ""
 
 [handoff]
-done = ""
-uncertain = ""
-next_check = ""
+done = "Mapped NMI from a fresh local trace: one contiguous range $00:80C9-$82D7, two RTI exits (normal, and a stack-swapping alt path when $012A != 0), callees 0089e0, 0083d1 (normal path) and 009337 (alt path). Callee unit files created. NMI is the setter of $12 (INC when zero), which answers the open question in 008000."
+uncertain = "0089e0 return width (jump table at $00:8C6E not decoded). Whether the alt path's $1F0A swap pairs with IRQ's use of $1F0A as a two-thread scheme (not traced here)."
+next_check = "Spec step: list the hw write order for both paths (APU ports, PPU mirrors, $4209/$420A/$4200 IRQ setup when $0128 != 0 or on the alt path, INIDISP/HDMAEN last). Note the $4210/$4211 reads (ack) and the 16-bit push/pull frame. Resolve the 0089e0 followup or carry it."

@@ -1,0 +1,41 @@
+id = "0083d1"
+name = "ReadJoypad"
+address = "$00:83D1"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Called from NMI at $00:8141, m8x8, only when $12 was zero. Tool trace: 20 insns, straight line, reads $4218/$4219, RTS at m8x8."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

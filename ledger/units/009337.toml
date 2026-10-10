@@ -1,0 +1,41 @@
+id = "009337"
+name = "NMI_UploadIf1F0C"
+address = "$00:9337"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Called from NMI alt path at $00:822D, m8x8. Tool trace: 20 insns; when $1F0C != 0 DMAs $0800 bytes $7E:E800 to VRAM $5800 and clears $1F0C. RTS at m8x8."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

@@ -1,0 +1,41 @@
+id = "0089e0"
+name = "NMI_DoUpdates"
+address = "$00:89E0"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Called from NMI at $00:813E, m8x8, only when $12 was zero. Tool trace: 252 insns, callee 009291, ends in JMP ($8C6E,X) with X=$17*2 (table count unknown)."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

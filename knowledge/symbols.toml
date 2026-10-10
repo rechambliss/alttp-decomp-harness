@@ -43,3 +43,31 @@ name = "MainModuleDispatch"
 kind = "routine"
 confidence = "guess"
 source = "008000 map: indexes byte tables by $10 and long-jumps through $03-$05; not yet mapped as its own unit"
+
+[[symbol]]
+address = "$00:822D"
+name = "NMI_AltThreadPath"
+kind = "label"
+confidence = "likely"
+source = "0080c9 map: NMI path taken when $012A != 0; swaps S with $1F0A before RTI"
+
+[[symbol]]
+address = "$00:83D1"
+name = "ReadJoypad"
+kind = "routine"
+confidence = "guess"
+source = "0080c9 map: called from NMI; reads auto-joypad $4218/$4219 into $F0-$FA; not yet mapped as its own unit"
+
+[[symbol]]
+address = "$00:89E0"
+name = "NMI_DoUpdates"
+kind = "routine"
+confidence = "guess"
+source = "0080c9 map: called from NMI when $12 was zero; ends in a jump table at $00:8C6E indexed by $17; not yet mapped"
+
+[[symbol]]
+address = "$00:9337"
+name = "NMI_UploadIf1F0C"
+kind = "routine"
+confidence = "guess"
+source = "0080c9 map: called from NMI alt path; DMA $7E:E800 -> VRAM $5800 ($0800 bytes) when $1F0C != 0; not yet mapped"
