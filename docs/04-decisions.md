@@ -16,17 +16,14 @@ Each decision gets an id. Open ones need Riley's call before work that depends o
 
 **D-006 Ledger is one file per unit.** This avoids merge conflicts when agents run in parallel.
 
+**D-007 In-house disassembler (closes O-002).** `alttp-recomp/tools/alttp-disasm` is a flow-following, M/X-aware 65816 disassembler. It prints the `[map]` block for a unit's ledger file. Its output is local only.
+
 ## Open
 
 **O-001 Reference emulator for differential tests.**
 It needs to support loading WRAM and CPU state, running to a return, snapshotting, and logging hardware writes.
 Options: embed an existing SNES core through bindings, or write a minimal 65816 interpreter for routine-level tests only.
 A minimal interpreter is enough for routine-level work, since most routines touch only WRAM. Frame-level work needs a full core.
-
-**O-002 Disassembler.**
-It must track M/X width across branches and record jump tables.
-Options: use an existing 65816 disassembler, or write one in `alttp-recomp/tools`.
-Either way, its output stays local and is never committed.
 
 **O-003 Community references.**
 Whether agents may consult public ALttP disassemblies and RAM maps for names and hints.

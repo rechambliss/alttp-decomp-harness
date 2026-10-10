@@ -1,9 +1,9 @@
 # Roadmap
 
 ## Phase 0: Tooling (before any unit work)
-- Settle O-001 (reference emulator) and O-002 (disassembler).
+- Settle O-001 (reference emulator).
 - ROM loader with hash check and LoROM mapping. Done in `alttp-recomp/crates/alttp-rom`.
-- A local disassembly dump command: `dump <address-range>` prints M/X-aware 65816 for one unit.
+- M/X-aware disassembler. Done in `alttp-recomp/tools/alttp-disasm`.
 - Routine-level differential runner: load state, run to return, diff WRAM and hardware writes.
 - Capture tooling: save gameplay states and extract the WRAM present at routine entry.
 

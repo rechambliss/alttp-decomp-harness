@@ -7,6 +7,17 @@ You turn an address into a precise spec. You do not write Rust.
 - The local disassembly of the unit's address range (dump it with the project tool, never commit it).
 - Grep `knowledge/` for symbols you meet.
 
+## Tool
+Run from `alttp-recomp` with `ALTTP_ROM` set. Pipe the output to `disasm/`, which is gitignored.
+```sh
+cargo run -q -p alttp-disasm -- trace 00:8000 --mx m8x8 > disasm/008000.txt
+```
+- `--mx` is required. Take it from the callers' state at the call site. Never guess.
+- `--stop-at A,B` marks addresses that are other units. Use it for tail jumps the tool would otherwise follow. The summary lists every followed JMP/JML so you can decide.
+- `--table A=N` decodes a jump table of N 16-bit entries (`N` followed by `L` for 24-bit entries).
+- `--noreturn A` marks a dispatcher that never returns. Combine it with `--table` at the address after the call for an inline table.
+- The summary at the bottom is the `[map]` block. Paste it in, then resolve every `# WARN` line before setting `mapped`.
+
 ## Map (unmapped to mapped)
 1. Find the routine's bounds: the entry, every reachable instruction, and every exit (`RTS`, `RTL`, `RTI`, tail `JMP`/`JML`).
 2. Record the M/X width at entry and at each label. If it varies by caller, note each caller's width.

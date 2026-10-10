@@ -6,4 +6,5 @@ No run planned yet.
 
 ## Blocked on open decisions
 
-Phase 0 tooling needs O-001 (reference emulator) and O-002 (disassembler) before any cartographer session can start.
+The disassembler is done, so cartographer sessions can start mapping.
+Verifier sessions are blocked on O-001 (reference emulator).
