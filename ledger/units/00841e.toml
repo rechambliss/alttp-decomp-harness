@@ -1,7 +1,7 @@
 id = "00841e"
 name = "ClearOamBuffer"
 address = "$00:841E"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = "Called by Reset main loop ($00:8053, JSR) at m8x8. Single RTS exit at m8x8. Straight-line leaf: PHD, then 4 passes (X = $60,$40,$20,$00; loop exits when X goes to $E0) that set D = $0800 then D = $0900 and store $F0 to 16 dp,X offsets each ($01,$05,..,$1D and $81,$85,..,$9D). Net effect: every 4th byte $0801..$08FD and $0901..$09FD = $F0, i.e. the Y byte of all 128 OAM entries in the low-table buffer. PLD, RTS. M/X stay m8x8 throughout. 51 insns, no callees, no tables: no split or merge."
@@ -16,13 +16,39 @@ size_insns = 51
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
+summary = """
+Hides every sprite in the OAM low-table shadow buffer by setting the Y byte of all 128 entries
+($7E:0801 + 4n, n = 0..127) to $F0. Saves D, then four passes with X = $60, $40, $20, $00: each pass
+sets D = $0800 and writes 16 bytes via dp,X, then sets D = $0900 and writes 16 more. Restores D, RTS.
+Called once per frame by Reset's main loop before the module runs. X, Y, tile and attr bytes untouched.
+"""
+inputs = [
+  "D (u16), saved and restored; its value does not affect the writes (D is set to $0800/$0900 before every store)",
+  "CPU width m8x8 (P.M=1, P.X=1); E=0 (native mode)",
+  "S: one 2-byte push/pull of D, net zero",
+]
+outputs = [
+  "WRAM $7E:0801 + 4n for n = 0..127 (i.e. $0801,$0805,..,$08FD and $0901,$0905,..,$09FD) = $F0 (128 bytes, OAM_BUFFER_LOW Y bytes)",
+  "A = $09E0 (A low = $E0 from the final TXA/SBC; B = $09 left by the last XBA/TCD setup)",
+  "X = $00E0 (X high stays 0 since X=1)",
+  "Y, DB, S unchanged; D = entry value",
+  "P: N/Z from PLD (16-bit restored D: Z=1,N=0 when D=$0000 as Reset uses), C=0 (borrow from $00-$20), V=0, M=1 X=1, I/D unchanged",
+]
 hw_writes = []
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "Exit N/Z come from PLD (it sets N/Z from the full 16-bit D pulled), not from the final SBC/TAX. The map handoff's N=1 Z=0 was wrong; with D=$0000 at entry the exit is Z=1 N=0.",
+  "B (A high byte) ends as $09 and X as $E0: the loop leaks these, translator must leave them so (caller then JSLs 0080b5, which only reads A low/Y after reloading).",
+  "Stores are DP writes, so they always hit bank $00 $0801.. = the WRAM $7E mirror regardless of DB.",
+  "Only Y bytes are written; X/tile/attr bytes ($0800+4n, +2, +3) and the OAM high table ($0A00-$0A1F) are left as they were.",
+  "Write order (for bus-exact verification): pass X=$60: $0861..$087D,$08E1..$08FD,$0961..$097D,$09E1..$09FD (step 4); then X=$40, $20, $00 likewise. Only the final memory state matters functionally.",
+  "No wrap: largest dp+X offset is $9D+$60 = $FD, so dp,X never crosses the 256-byte page.",
+]
+test_states = [
+  "Buffer $0800-$0A1F filled with a nonzero, non-$F0 pattern (e.g. index bytes), D=$0000, A=$01xx, X=$xx, Y arbitrary: confirm only the 128 Y bytes become $F0 and nothing else in $0700-$0BFF changes.",
+  "Same with D=$1234 (nonzero) at entry: confirm D restored, writes identical, exit N=0 Z=0; and D=$8000 for N=1.",
+  "Check exit registers: A=$09E0, X=$E0, Y unchanged, C=0, V=0, S unchanged.",
+]
 
 [code]
 file = ""
@@ -36,6 +62,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped $00:841E-$8479 (51 insns, m8x8 at entry and every label, single RTS). Leaf: no callees, no jump tables. Renamed ClearOamBuffer (likely): writes $F0 to OAM Y bytes for all 128 sprites in the $0800-$09FF buffer."
-uncertain = "Exit state for the spec step: X = $E0, A low = $E0, B (A high) = $09, N=1 Z=0 C=0 (SBC borrow from $00-$20), D restored from stack. Whether the caller relies on any of that is unchecked. Native-mode dp,X addressing does not page-wrap here (max offset $9D+$60 = $FD)."
-next_check = "Cartographer: spec step (mapped -> specced). Only memory writes are the 128 bytes $7E:0801+4n (n=0..127) via the bank-0 WRAM mirror; no hw regs touched."
+done = "Specced (mapped -> specced). Re-dumped and confirmed the map: straight-line leaf, m8x8 throughout, only memory effect is $F0 into the 128 OAM Y bytes $7E:0801+4n. No hw writes, no scratch."
+uncertain = "Corrected the map handoff's exit flags: PLD sets N/Z from the restored D, so N/Z depend on entry D (Z=1 N=0 for Reset's D=0). Whether any caller reads exit A/X/flags is unchecked; Reset's next call is JSL 0080b5, which reloads A and Y."
+next_check = "Translator: implement as a plain loop over the 128 Y bytes plus the exit register/flag state in [spec].outputs. Verifier: diff $0700-$0BFF plus A, X, D, P."
