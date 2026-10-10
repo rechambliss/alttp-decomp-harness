@@ -26,7 +26,9 @@ python3 scripts/ledger.py next        # next units ready for each role
 python3 scripts/ledger.py validate    # check ledger integrity
 ```
 
-To run a session, paste `prompts/kickoff.md` into a fresh agent session with both repos checked out side by side:
+To run many units back to back, paste `prompts/driver.md` into one Claude Code session. It starts a fresh subagent per unit, one at a time.
+
+To run a single session by hand, paste `prompts/kickoff.md` into a fresh agent session with both repos checked out side by side:
 
 ```
 work/
