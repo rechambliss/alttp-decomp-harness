@@ -1,0 +1,41 @@
+id = "00803b"
+name = "sub_00803b"
+address = "$00:803B"
+status = "unmapped"
+owner = "run-2026-10-10-b"
+blocked_reason = ""
+notes = "Followup from 008000. Bytes $00:803B-$8050 are skipped by the branch at $00:8039 and unreachable from Reset. They read $F6 and $0FD7 and branch to $8051 or $805A. Check whether any other code reaches them before treating them as dead."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""

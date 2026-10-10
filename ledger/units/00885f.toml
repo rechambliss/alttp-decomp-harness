@@ -1,0 +1,41 @@
+id = "00885f"
+name = "sub_00885f"
+address = "$00:885F"
+status = "unmapped"
+owner = ""
+blocked_reason = ""
+notes = "Followup from 008000. Callee of 0088d8. Confirm it preserves M/X so 0088d8 returns to Reset at m8x8."
+followups = []
+
+[map]
+bounds = []
+mx_entry = ""
+callees = []
+jump_tables = []
+size_insns = 0
+merged_into = ""
+
+[spec]
+summary = ""
+inputs = []
+outputs = []
+hw_writes = []
+scratch = []
+quirks = []
+test_states = []
+
+[code]
+file = ""
+function = ""
+
+[verify]
+fixtures = ""
+result = ""
+
+[review]
+result = ""
+
+[handoff]
+done = ""
+uncertain = ""
+next_check = ""
