@@ -1,7 +1,7 @@
 id = "0080b5"
 name = "MainModuleDispatch"
 address = "$00:80B5"
-status = "mapped"
+status = "specced"
 owner = ""
 blocked_reason = ""
 notes = """
@@ -29,13 +29,42 @@ size_insns = 8
 merged_into = ""
 
 [spec]
-summary = ""
-inputs = []
-outputs = []
+summary = """
+Per-frame main-module dispatcher. Reads the module number from $10, looks up the module's
+24-bit entry address in three parallel byte tables in bank 00 (lo $8061, hi $807D, bank $8099),
+stores it at $03-$05 and tail-jumps there with JML [$0003]. The module's RTL returns straight
+to Reset's loop ($00:805A). No bounds check on $10.
+"""
+inputs = [
+  "WRAM $7E:0010 MODULE_INDEX (u8), read via DP (D=$0000) into Y",
+  "DB = $00 (table reads are LDA abs,Y in data bank DB)",
+  "D = $0000 (STA $03/$04/$05 are DP writes; JML [$0003] always reads bank 00 $0003, so the two only agree when D=0)",
+  "CPU width m8x8 (P.M=1, P.X=1)",
+  "ROM $00:8061-$00:80B4 (three 28-byte tables) and, for out-of-range indices, bytes up to $00:8198",
+]
+outputs = [
+  "WRAM $7E:0003 DISPATCH_PTR lo = Lo[$10] (u8)",
+  "WRAM $7E:0004 DISPATCH_PTR hi = Hi[$10] (u8)",
+  "WRAM $7E:0005 DISPATCH_PTR bank = Bank[$10] (u8)",
+  "Y = $10 (u8; high byte of Y is 0 since X=1)",
+  "A low byte = Bank[$10]; B (A high byte) unchanged",
+  "X, D, DB, S unchanged; P: N/Z from the last LDA (the bank byte), other flags unchanged",
+  "PC/PB = the 24-bit address at $03-$05 (tail jump, no return to this routine)",
+]
 hw_writes = []
 scratch = []
-quirks = []
-test_states = []
+quirks = [
+  "No bounds check: $10 >= $1C reads past each table. each read is just ROM bank 00 at table+Y, so Lo[28..55] = Hi[0..27], Lo[56..83] = Bank[0..27], Hi[28..55] = Bank[0..27], and anything at or past $00:80B5 is this routine's own code bytes and what follows. Reproduce as a raw byte read of ROM bank 00 at table+Y, not a Rust array index that panics.",
+  "Duplicate table entries: modules $08 and $0A both go to $02:83B9, modules $09 and $0B both go to $02:A482. Keep both entries; do not dedupe the table.",
+  "Tail jump, not a call: it pushes nothing. The module's RTL uses Reset's JSL frame, so in Rust the module must be called in place of this routine and its return goes back to Reset.",
+  "$03-$05 keep the module entry address after the jump; modules may read or overwrite them, so the write must happen before the module runs.",
+  "Tables are read through DB, not a long address. DB is $00 from reset and never changed on this path.",
+]
+test_states = [
+  "Each valid $10 from $00 to $1B with D=0, DB=0, m8x8: check $03-$05, A, Y and the jump target (28 states; include $08/$0A and $09/$0B to confirm duplicates).",
+  "Out-of-range $10 = $1C, $37, $38 and $FF: check $03-$05 hold the overflow bytes from the next table or the code at $80B5 (stop before executing the bogus target).",
+  "Nonzero B (e.g. A=$01xx as Reset leaves it) and an arbitrary X: confirm B and X are preserved.",
+]
 
 [code]
 file = ""
@@ -49,6 +78,6 @@ result = ""
 result = ""
 
 [handoff]
-done = "Mapped: 8 insns at $00:80B5-$80C8, m8x8, single caller Reset. Decoded the split byte table (lo $8061, hi $807D, bank $8099, 28 entries, size proven by spacing). Created 26 unit files for the distinct targets."
-uncertain = "Whether $10 ever exceeds $1B (out-of-table read). Return width of each module is not checked yet; that belongs to the target units."
-next_check = "Spec step (next cartographer): inputs $10 and DB, outputs $03-$05 and Y/A at the jump; translator can model it as a 28-entry fn table plus a faithful out-of-range read."
+done = "Mapped: 8 insns at $00:80B5-$80C8, m8x8, single caller Reset; split table decoded (28 entries, 26 target units). Specced (run-2026-10-10-b): fresh trace matches the map; inputs $10/DB/D, outputs $03-$05/A/Y/flags, no hw writes, quirks for the unchecked index, duplicate entries and the tail-jump frame."
+uncertain = "Whether $10 ever exceeds $1B in real play (out-of-table read). Return width of each module is still unchecked; that belongs to the 26 target units."
+next_check = "Translator: model as a read of ROM bank 00 at table+Y (not a bounded array) followed by a tail call into the module fn; keep A/Y/$03-$05 side effects. Verifier: run the 28 valid states plus the out-of-range ones in test_states."
